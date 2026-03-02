@@ -1,0 +1,50 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Bb]uild/
+[Bb]uilds/
+[Uu]ser[Ss]ettings/
+
+# Unity auto-generated schema
+UIElementsSchema/
+
+# Visual Studio / Rider IDE files
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vscode/
+
+# Build outputs (iOS, Android, macOS app bundles, etc.)
+*.app
+*.ipa
+*.apk
+*.aab
+iosapp/
+AndroidPlayer/
+iOSPlayer/
+
+# OS generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Crash reports
+sysinfo.txt
+crashlytics-build.properties

@@ -1,0 +1,1 @@
+controller_joint_names: ['', 'cabin_joint', 'rev_joint', 'boom_joint', 'stick_joint', 'bucket_joint', 'pedal1_joint', 'pedal2_joint', 'bulldozer_joint', ]

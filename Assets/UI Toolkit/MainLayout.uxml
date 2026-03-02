@@ -1,0 +1,97 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI%20Toolkit/MainLayout.uss?fileID=7433441132597879392&amp;guid=54e6cba33813a423f9a3691e99d3353d&amp;type=3#MainLayout" />
+    <ui:VisualElement name="root" class="root">
+        <ui:VisualElement name="main-body" class="main-body">
+            <ui:VisualElement name="left-panel" class="panel left-panel">
+                <ui:Label text="控制面板" class="panel-title" />
+                <ui:VisualElement class="control-section">
+                    <ui:Label text="大臂" class="control-label" />
+                    <ui:Slider name="slider-boom" low-value="-100" high-value="100" class="control-slider" />
+                </ui:VisualElement>
+                <ui:VisualElement class="control-section">
+                    <ui:Label text="小臂" class="control-label" />
+                    <ui:Slider name="slider-arm" low-value="-100" high-value="100" class="control-slider" />
+                </ui:VisualElement>
+                <ui:VisualElement class="control-section">
+                    <ui:Label text="铲斗" class="control-label" />
+                    <ui:Slider name="slider-bucket" low-value="-100" high-value="100" class="control-slider" />
+                </ui:VisualElement>
+                <ui:VisualElement class="control-section">
+                    <ui:Label text="回转" class="control-label" />
+                    <ui:Slider name="slider-swing" low-value="-100" high-value="100" class="control-slider" />
+                </ui:VisualElement>
+                <ui:VisualElement class="control-section">
+                    <ui:Label text="行走" class="control-label" />
+                    <ui:SliderInt name="slider-travel" low-value="-100" high-value="100" class="control-slider" />
+                </ui:VisualElement>
+                <ui:VisualElement class="button-group">
+                    <ui:Button name="btn-engine-start" text="启动引擎" class="btn btn-primary" />
+                    <ui:Button name="btn-engine-stop" text="停止引擎" class="btn btn-danger" />
+                    <ui:Button name="btn-horn" text="鸣笛" class="btn btn-warning" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="center-viewport" class="center-viewport">
+                <ui:Label text="3D 视口" class="viewport-label" />
+                <ui:VisualElement class="viewport-toolbar">
+                    <ui:Button name="btn-view-front" text="前" class="btn btn-sm" />
+                    <ui:Button name="btn-view-side" text="侧" class="btn btn-sm" />
+                    <ui:Button name="btn-view-top" text="顶" class="btn btn-sm" />
+                    <ui:Button name="btn-view-free" text="自由" class="btn btn-sm" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="right-panel" class="panel right-panel">
+                <ui:Label text="设备信息" class="panel-title" />
+                <ui:VisualElement class="info-card">
+                    <ui:Label text="关节角度" class="info-card-title" />
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="大臂" class="info-key" />
+                        <ui:Label name="lbl-angle-boom" text="0°" class="info-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="小臂" class="info-key" />
+                        <ui:Label name="lbl-angle-arm" text="0°" class="info-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="铲斗" class="info-key" />
+                        <ui:Label name="lbl-angle-bucket" text="0°" class="info-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="回转" class="info-key" />
+                        <ui:Label name="lbl-angle-swing" text="0°" class="info-value" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="info-card">
+                    <ui:Label text="位置信息" class="info-card-title" />
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="经度" class="info-key" />
+                        <ui:Label name="lbl-lng" text="--" class="info-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="info-row">
+                        <ui:Label text="纬度" class="info-key" />
+                        <ui:Label name="lbl-lat" text="--" class="info-value" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="bottom-bar" class="bottom-bar">
+            <ui:VisualElement class="status-group">
+                <ui:VisualElement class="status-indicator status-dot-green" />
+                <ui:Label name="lbl-conn-status" text="通信正常" class="status-text" />
+            </ui:VisualElement>
+            <ui:VisualElement class="status-group">
+                <ui:Label text="信号强度" class="status-text" />
+                <ui:ProgressBar name="pb-signal" class="signal-bar" />
+            </ui:VisualElement>
+            <ui:VisualElement class="status-group">
+                <ui:Label text="电池" class="status-text" />
+                <ui:ProgressBar name="pb-battery" class="battery-bar" />
+            </ui:VisualElement>
+            <ui:VisualElement class="status-group">
+                <ui:Label name="lbl-datetime" text="2026-02-11 00:00:00" class="status-text status-time" />
+            </ui:VisualElement>
+            <ui:VisualElement class="status-group">
+                <ui:Label name="lbl-warn" class="status-text status-warn" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

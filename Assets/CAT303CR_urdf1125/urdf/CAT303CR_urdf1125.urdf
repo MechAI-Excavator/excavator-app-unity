@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="CAT303CR_urdf1125">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.01539 0 0.21667"
+        rpy="0 0 0" />
+      <mass
+        value="521.64" />
+      <inertia
+        ixx="53.257"
+        ixy="4.8889E-15"
+        ixz="-1.4417"
+        iyy="69.054"
+        iyz="-8.8558E-16"
+        izz="107.95" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="cabin_Link">
+    <inertial>
+      <origin
+        xyz="-0.11405 -0.064813 0.45143"
+        rpy="0 0 0" />
+      <mass
+        value="1216.8" />
+      <inertia
+        ixx="304.73"
+        ixy="14.815"
+        ixz="16.457"
+        iyy="304.96"
+        iyz="-0.2083"
+        izz="315.38" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/cabin_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/cabin_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="cabin_joint"
+    type="revolute">
+    <origin
+      xyz="0 0 0.49"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="cabin_Link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="rev_Link">
+    <inertial>
+      <origin
+        xyz="0.200526630689212 -0.0194119141687121 -0.00195878179254366"
+        rpy="0 0 0" />
+      <mass
+        value="26.6751421416071" />
+      <inertia
+        ixx="0.822138767438788"
+        ixy="-0.07474442058596"
+        ixz="-0.0510749624287177"
+        iyy="0.920226579535997"
+        iyz="-0.0627981420604525"
+        izz="0.618651057518904" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/rev_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/rev_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rev_joint"
+    type="revolute">
+    <origin
+      xyz="0.86391 0 0.175"
+      rpy="0 0 0" />
+    <parent
+      link="cabin_Link" />
+    <child
+      link="rev_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="boom_Link">
+    <inertial>
+      <origin
+        xyz="0.241799297015019 -1.13694434907406 -1.23892902899656E-16"
+        rpy="0 0 0" />
+      <mass
+        value="70.1408263729102" />
+      <inertia
+        ixx="19.3852712358353"
+        ixy="8.35058399479074"
+        ixz="-3.16928164001285E-16"
+        iyy="5.90154931865145"
+        iyz="4.67379686962877E-16"
+        izz="25.0339113404936" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/boom_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/boom_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="boom_joint"
+    type="revolute">
+    <origin
+      xyz="0.2899 0 0.315"
+      rpy="-1.5708 0 0" />
+    <parent
+      link="rev_Link" />
+    <child
+      link="boom_Link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="stick_Link">
+    <inertial>
+      <origin
+        xyz="0.330640751648591 -0.262689444878419 1.41060556833889E-16"
+        rpy="0 0 0" />
+      <mass
+        value="27.8858892712718" />
+      <inertia
+        ixx="0.754109119841832"
+        ixy="1.61127289162212"
+        ixz="-5.39279323153356E-17"
+        iyy="4.41810018015841"
+        iyz="7.63231073063206E-17"
+        izz="5.11963307486665" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/stick_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/stick_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="stick_joint"
+    type="revolute">
+    <origin
+      xyz="0.97568 -1.9806 0"
+      rpy="0 0 -1.1131" />
+    <parent
+      link="boom_Link" />
+    <child
+      link="stick_Link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="bucket_Link">
+    <inertial>
+      <origin
+        xyz="0.202891271683752 0.316327322352407 1.41814808039781E-16"
+        rpy="0 0 0" />
+      <mass
+        value="29.7286200281155" />
+      <inertia
+        ixx="2.32184317184921"
+        ixy="-0.0201444941065581"
+        ixz="1.36242493634409E-17"
+        iyy="1.50386495773506"
+        iyz="-6.13021683273387E-16"
+        izz="1.84730258236483" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/bucket_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/bucket_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="bucket_joint"
+    type="revolute">
+    <origin
+      xyz="1.1312 -0.55725 0"
+      rpy="0 0 -0.45773" />
+    <parent
+      link="stick_Link" />
+    <child
+      link="bucket_Link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="pedal1_Link">
+    <inertial>
+      <origin
+        xyz="0.00217806887205035 0.126505998261783 -0.0334247445708572"
+        rpy="0 0 0" />
+      <mass
+        value="0.958677940386786" />
+      <inertia
+        ixx="0.0287216441999266"
+        ixy="-0.00358246258675839"
+        ixz="-1.31088244066506E-05"
+        iyy="0.00345301909479394"
+        iyz="0.00102468766664704"
+        izz="0.0312175029585488" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/pedal1_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/pedal1_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="pedal1_joint"
+    type="revolute">
+    <origin
+      xyz="0.44391 0.22014 0.38"
+      rpy="1.5708 0 3.1416" />
+    <parent
+      link="cabin_Link" />
+    <child
+      link="pedal1_Link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="pedal2_Link">
+    <inertial>
+      <origin
+        xyz="-0.0019607192570324 0.126506684251541 0.000977562853780437"
+        rpy="0 0 0" />
+      <mass
+        value="0.958679528351192" />
+      <inertia
+        ixx="0.0287218882726506"
+        ixy="-0.00358251925575157"
+        ixz="1.30998629446853E-05"
+        iyy="0.00345303510278483"
+        iyz="-0.00102472922003058"
+        izz="0.0312177570644897" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/pedal2_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/pedal2_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="pedal2_joint"
+    type="revolute">
+    <origin
+      xyz="0.43977 0.072584 0.38"
+      rpy="1.5708 0 -3.1416" />
+    <parent
+      link="cabin_Link" />
+    <child
+      link="pedal2_Link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="bulldozer_Link">
+    <inertial>
+      <origin
+        xyz="-0.922911969612226 0.013191235264968 -1.52463049132849E-16"
+        rpy="0 0 0" />
+      <mass
+        value="90.1137030111788" />
+      <inertia
+        ixx="13.6384487172176"
+        ixy="0.0796847181330669"
+        ixz="0.0174819866988857"
+        iyy="21.8698212511802"
+        iyz="0.00148808684628118"
+        izz="9.36186151810711" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/bulldozer_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://CAT303CR_urdf1125/meshes/bulldozer_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="bulldozer_joint"
+    type="revolute">
+    <origin
+      xyz="0.475 0 0.21"
+      rpy="1.5708 0 3.1416" />
+    <parent
+      link="base_link" />
+    <child
+      link="bulldozer_Link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="0"
+      velocity="0" />
+  </joint>
+</robot>

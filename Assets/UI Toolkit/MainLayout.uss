@@ -1,0 +1,391 @@
+/* ============================================================
+   挖掘机控制 App — 深色工业风主题
+   Flex 布局 · 平板自适应
+   ============================================================ */
+
+/* ---------- CSS 变量 / 全局色板 ---------- */
+:root {
+    /* 主色 */
+    --color-bg-dark:        #1a1d23;
+    --color-bg-panel:       #22262e;
+    --color-bg-card:        #2a2f38;
+    --color-bg-bottom:      #16181d;
+    --color-border:         #3a3f4a;
+    --color-accent:         #f0a500;
+    --color-accent-hover:   #d4940a;
+    --color-text-primary:   #e8eaed;
+    --color-text-secondary: #9ba1ad;
+    --color-danger:         #e5443a;
+    --color-success:        #35c759;
+    --color-warning:        #f0a500;
+}
+
+/* ---------- 强制 Unity 内部包裹容器透明 ---------- */
+TemplateContainer {
+    background-color: rgba(0, 0, 0, 0);
+    flex-grow: 1;
+}
+
+.unity-ui-document__root {
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ---------- 根容器 ---------- */
+.root {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ---------- 主体区域（三栏） ---------- */
+.main-body {
+    flex-grow: 1;
+    flex-direction: row;
+    flex-shrink: 1;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* ---------- 通用面板 ---------- */
+.panel {
+    background-color: var(--color-bg-panel);
+    border-color: var(--color-border);
+    padding: 10px;
+    overflow: hidden;
+}
+
+.panel-title {
+    font-size: 16px;
+    color: var(--color-accent);
+    -unity-font-style: bold;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom-width: 2px;
+    border-bottom-color: var(--color-accent);
+}
+
+/* ---------- 左侧控制区 18% ---------- */
+.left-panel {
+    width: 18%;
+    min-width: 160px;
+    border-right-width: 1px;
+    flex-shrink: 0;
+    flex-direction: column;
+}
+
+/* ---------- 右侧信息区 20% ---------- */
+.right-panel {
+    width: 20%;
+    min-width: 180px;
+    border-left-width: 1px;
+    flex-shrink: 0;
+    flex-direction: column;
+    overflow: scroll;
+}
+
+/* ---------- 中间 3D 视口 ---------- */
+.center-viewport {
+    flex-grow: 1;
+    flex-shrink: 1;
+    background-color: rgba(0, 0, 0, 0);
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.viewport-label {
+    font-size: 22px;
+    color: rgba(255, 255, 255, 0.12);
+    -unity-font-style: bold;
+    position: absolute;
+}
+
+.viewport-toolbar {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    flex-direction: row;
+}
+
+.viewport-toolbar .btn-sm {
+    width: 42px;
+    height: 32px;
+    margin-left: 4px;
+    font-size: 12px;
+    background-color: rgba(34, 38, 46, 0.85);
+    color: var(--color-text-primary);
+    border-width: 1px;
+    border-color: var(--color-border);
+    border-radius: 4px;
+}
+
+.viewport-toolbar .btn-sm:hover {
+    background-color: var(--color-accent);
+    color: #1a1d23;
+}
+
+/* ---------- 控制区 — 滑块组 ---------- */
+.control-section {
+    margin-bottom: 10px;
+}
+
+.control-label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+}
+
+.control-slider {
+    height: 24px;
+}
+
+.control-slider .unity-base-slider__dragger {
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background-color: var(--color-accent);
+    border-width: 0;
+    margin-top: -7px;
+}
+
+.control-slider .unity-base-slider__tracker {
+    height: 4px;
+    background-color: #3a3f4a;
+    border-radius: 2px;
+    border-width: 0;
+    margin-top: -2px;
+}
+
+/* ---------- 控制区 — 按钮组 ---------- */
+.button-group {
+    margin-top: 16px;
+    flex-direction: column;
+}
+
+.btn {
+    height: 38px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    -unity-font-style: bold;
+    border-radius: 6px;
+    border-width: 0;
+    color: #ffffff;
+    -unity-text-align: middle-center;
+    transition-duration: 0.15s;
+}
+
+.btn:hover {
+    scale: 1.03;
+}
+
+.btn:active {
+    scale: 0.97;
+}
+
+.btn-primary {
+    background-color: #2e7d32;
+}
+
+.btn-primary:hover {
+    background-color: #388e3c;
+}
+
+.btn-danger {
+    background-color: var(--color-danger);
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn-warning {
+    background-color: var(--color-warning);
+    color: #1a1d23;
+}
+
+.btn-warning:hover {
+    background-color: var(--color-accent-hover);
+}
+
+/* ---------- 右侧 — 信息卡片 ---------- */
+.info-card {
+    background-color: var(--color-bg-card);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-width: 1px;
+    border-color: var(--color-border);
+}
+
+.info-card-title {
+    font-size: 13px;
+    color: var(--color-accent);
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(240, 165, 0, 0.25);
+}
+
+.info-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    height: 24px;
+}
+
+.info-key {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.info-value {
+    font-size: 13px;
+    color: var(--color-text-primary);
+    -unity-font-style: bold;
+}
+
+.status-on {
+    color: var(--color-success);
+}
+
+.status-off {
+    color: var(--color-danger);
+}
+
+/* ---------- 底部状态栏 固定 80px ---------- */
+.bottom-bar {
+    height: 80px;
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 16px;
+    padding-right: 16px;
+    background-color: var(--color-bg-bottom);
+    border-top-width: 1px;
+    border-top-color: var(--color-border);
+}
+
+.status-group {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 20px;
+}
+
+.status-text {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-left: 6px;
+}
+
+.status-time {
+    color: var(--color-text-primary);
+    -unity-font-style: bold;
+}
+
+.status-warn {
+    color: var(--color-danger);
+    -unity-font-style: bold;
+}
+
+/* ---------- 状态指示灯 ---------- */
+.status-dot-green {
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    background-color: var(--color-success);
+}
+
+.status-dot-red {
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    background-color: var(--color-danger);
+}
+
+/* ---------- 进度条 — 信号 & 电池 ---------- */
+.signal-bar,
+.battery-bar {
+    width: 80px;
+    height: 14px;
+    margin-left: 6px;
+}
+
+.signal-bar .unity-progress-bar__background,
+.battery-bar .unity-progress-bar__background {
+    background-color: #2a2f38;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: var(--color-border);
+}
+
+.signal-bar .unity-progress-bar__progress,
+.battery-bar .unity-progress-bar__progress {
+    background-color: var(--color-success);
+    border-radius: 3px;
+}
+
+/* ---------- 滚动条样式 ---------- */
+.unity-scroller--vertical {
+    width: 6px;
+}
+
+.unity-scroller--vertical .unity-base-slider__dragger {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    border-width: 0;
+}
+
+/* ============================================================
+   平板自适应备注
+   ============================================================
+   Unity UI Toolkit 不直接支持 @media query，
+   可在 C# 中根据 Screen.width / Screen.height 动态切换 class：
+   - 窄屏 (<900px)：左右面板折叠为抽屉，中间区域全屏
+   - 竖屏平板：底栏减至 60px，面板叠放到底部
+   在 USS 中预留以下 class 供 C# 切换使用：
+   ============================================================ */
+
+/* 窄屏/竖屏时左右面板隐藏 */
+.panel--collapsed {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    display: none;
+}
+
+/* 窄屏时底栏缩小 */
+.bottom-bar--compact {
+    height: 54px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.bottom-bar--compact .status-text {
+    font-size: 11px;
+}
+
+/* 窄屏时显示汉堡菜单入口 */
+.hamburger-toggle {
+    width: 40px;
+    height: 40px;
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background-color: rgba(34, 38, 46, 0.9);
+    border-width: 1px;
+    border-color: var(--color-border);
+    border-radius: 6px;
+    font-size: 20px;
+    color: var(--color-text-primary);
+    display: none;
+}
+
+/* 当面板折叠时显示汉堡菜单 */
+.hamburger-toggle--visible {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
