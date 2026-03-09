@@ -5,21 +5,14 @@
             <ui:VisualElement name="left-panel" class="panel left-panel">
                 <ui:Label text="控制面板" class="panel-title" />
 
-                <ui:VisualElement class="button-group">
-                    <ui:Button name="btn-engine-start" text="启动引擎" class="btn btn-primary" />
-                    <ui:Button name="btn-engine-stop" text="停止引擎" class="btn btn-danger" />
-                    <ui:Button name="btn-horn" text="鸣笛" class="btn btn-warning" />
-                </ui:VisualElement>
+
                 <ui:VisualElement name="overpass-map" class="map-view" />
             </ui:VisualElement>
+            
             <ui:VisualElement name="center-viewport" class="center-viewport">
-                <ui:VisualElement class="viewport-toolbar">
-                    <ui:Button name="btn-view-front" text="前" class="btn btn-sm" />
-                    <ui:Button name="btn-view-side" text="侧" class="btn btn-sm" />
-                    <ui:Button name="btn-view-top" text="顶" class="btn btn-sm" />
-                    <ui:Button name="btn-view-free" text="自由" class="btn btn-sm" />
-                </ui:VisualElement>
+  
             </ui:VisualElement>
+
             <ui:VisualElement name="right-panel" class="panel right-panel">
                 <ui:Label text="设备信息" class="panel-title" />
 
