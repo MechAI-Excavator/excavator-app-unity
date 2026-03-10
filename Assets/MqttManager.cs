@@ -28,7 +28,7 @@ public class MqttManager : MonoBehaviour
 
     [Header("Topics")]
     [Tooltip("启动时自动订阅的主题列表")]
-    public string[] subscribeTopics = { "excavator/sensor", "01/map/elevation", "01/sensor/rtk_lio" };
+    public string[] subscribeTopics = { "excavator/sensor", "01/map/elevation", "01/sensor/rtk_lio", "01/joint_control" };
 
     [Tooltip("发布数据的默认主题")]
     public string publishTopic = "excavator/control";
@@ -43,13 +43,16 @@ public class MqttManager : MonoBehaviour
     public event Action OnConnected;
     public event Action OnDisconnected;
     public event Action<RtkGpsMsg> OnRtkUpdated;
+    public event Action<SystemStatusMsg> OnStatusUpdated;
 
     private MqttClient client;
     private readonly Queue<(string topic, string msg)> messageQueue = new();
     private readonly object queueLock = new();
+    private ExcavatorController _excavatorController;
 
     void Start()
     {
+        _excavatorController = FindFirstObjectByType<ExcavatorController>();
         Connect();
     }
 
@@ -173,21 +176,34 @@ public class MqttManager : MonoBehaviour
                 Debug.Log($"[MQTT] 高度图: {msg}");
                 HandleElevation(msg);
                 break;
-            case "excavator/sensor":
-                HandleSensor(msg);
-                break;
             case "01/status":
                 HandleStatus(msg);
                 break;
             case "01/sensor/rtk_lio":
                 HandleRtkLio(msg);
                 break;
+            case "01/joint_control":
+                HandleJointControl(msg);
+                break;
         }
     }
 
     private void HandleStatus(string msg)
     {
-        Debug.Log($"[MQTT] 状态更新: {msg}");
+        try
+        {
+            var status = JsonUtility.FromJson<SystemStatusMsg>(msg);
+            if (status == null)
+            {
+                Debug.LogWarning("[MQTT] 系统状态数据解析失败或为空");
+                return;
+            }
+            OnStatusUpdated?.Invoke(status);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[MQTT] 系统状态解析异常: {e.Message}");
+        }
     }
 
     private void HandleSensor(string msg)
@@ -219,6 +235,40 @@ public class MqttManager : MonoBehaviour
         }
     }
 
+    private void HandleJointControl(string msg)
+    {
+        try
+        {
+            var data = JsonUtility.FromJson<JointControlMsg>(msg);
+            if (data?.joints == null)
+            {
+                Debug.LogWarning("[MQTT] 关节控制数据解析失败或 joints 为空");
+                return;
+            }
+
+            if (_excavatorController == null)
+                _excavatorController = FindFirstObjectByType<ExcavatorController>();
+
+            if (_excavatorController != null)
+            {
+                _excavatorController.ApplyJointControl(
+                    data.joints.cabin.angle,
+                    data.joints.boom.angle,
+                    data.joints.stick.angle,
+                    data.joints.bucket.angle
+                );
+            }
+            else
+            {
+                Debug.LogWarning("[MQTT] 场景中未找到 ExcavatorController，无法应用关节控制");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[MQTT] 关节控制解析异常: {e.Message}");
+        }
+    }
+
     private void HandleElevation(string msg)
     {
         try
@@ -240,4 +290,81 @@ public class MqttManager : MonoBehaviour
             Debug.LogError($"[MQTT] 高程图解析异常: {e.Message}");
         }
     }
+}
+
+[Serializable]
+public class JointState
+{
+    public float angle;
+    public float velocity;
+}
+
+[Serializable]
+public class JointsPayload
+{
+    public JointState cabin;
+    public JointState boom;
+    public JointState stick;
+    public JointState bucket;
+}
+
+[Serializable]
+public class JointControlMsg
+{
+    public double timestamp;
+    public JointsPayload joints;
+}
+
+// ── 系统状态消息 ─────────────────────────────────────────────
+
+[Serializable]
+public class PowerStatus
+{
+    public float battery_level;
+    public float voltage;
+    public float current;
+}
+
+[Serializable]
+public class TemperatureStatus
+{
+    public float motor;
+    public float controller;
+    public float hydraulic;
+}
+
+[Serializable]
+public class SystemStatus
+{
+    public PowerStatus power;
+    public TemperatureStatus temperature;
+    public string mode;
+    public int uptime;
+}
+
+[Serializable]
+public class FaultItem
+{
+    public string code;
+    public string severity;
+    public string message;
+    public double timestamp;
+}
+
+[Serializable]
+public class MissionStatus
+{
+    public string current_task;
+    public float progress;
+    public double estimated_completion;
+    public string command_id;
+}
+
+[Serializable]
+public class SystemStatusMsg
+{
+    public double timestamp;
+    public SystemStatus system_status;
+    public FaultItem[] faults;
+    public MissionStatus mission_status;
 }

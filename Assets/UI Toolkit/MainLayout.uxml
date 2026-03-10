@@ -16,27 +16,70 @@
             <ui:VisualElement name="right-panel" class="panel right-panel">
                 <ui:Label text="设备信息" class="panel-title" />
 
+                <!-- 任务进度卡片 -->
+                <ui:VisualElement name="mission-card" class="info-card">
+                    <ui:Label text="当前任务" class="info-card-title" />
+                    <ui:VisualElement class="mission-name-row">
+                        <ui:Label name="lbl-mission-task" text="无任务" class="mission-task-name" />
+                        <ui:Label name="lbl-mission-pct" text="--%"  class="mission-pct" />
+                    </ui:VisualElement>
+                    <ui:ProgressBar name="pb-mission" class="mission-bar-full" />
+                    <ui:VisualElement class="mission-meta-row">
+                        <ui:Label text="指令 ID" class="mission-meta-key" />
+                        <ui:Label name="lbl-mission-cmd" text="--" class="mission-meta-val" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- 故障列表卡片 -->
+                <ui:VisualElement name="fault-card" class="info-card">
+                    <ui:VisualElement class="fault-card-header">
+                        <ui:Label text="故障信息" class="info-card-title" style="margin-bottom:0;" />
+                        <ui:Label name="lbl-fault-count" text="0" class="fault-count-badge fault-count-ok" />
+                    </ui:VisualElement>
+                    <ui:ScrollView name="fault-list" class="fault-list">
+                        <!-- 条目由 UILogic 动态填充 -->
+                    </ui:ScrollView>
+                </ui:VisualElement>
 
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="bottom-bar" class="bottom-bar">
-            <ui:VisualElement class="status-group">
-                <ui:VisualElement class="status-indicator status-dot-green" />
-                <ui:Label name="lbl-conn-status" text="通信正常" class="status-text" />
+            <!-- 通信状态 -->
+            <ui:VisualElement class="status-cell">
+                <ui:Label text="通信状态" class="cell-label" />
+                <ui:VisualElement class="cell-row">
+                    <ui:VisualElement name="dot-conn" class="status-dot status-dot-green" />
+                    <ui:Label name="lbl-conn-status" text="通信正常" class="cell-value" />
+                </ui:VisualElement>
             </ui:VisualElement>
-            <ui:VisualElement class="status-group">
-                <ui:Label text="信号强度" class="status-text" />
-                <ui:ProgressBar name="pb-signal" class="signal-bar" />
+            <!-- 电池 -->
+            <ui:VisualElement class="status-cell">
+                <ui:Label text="电池电量" class="cell-label" />
+                <ui:VisualElement class="cell-row">
+                    <ui:ProgressBar name="pb-battery" class="battery-bar" />
+                    <ui:Label name="lbl-battery-pct" text="--%"  class="cell-value" />
+                </ui:VisualElement>
+                <ui:Label name="lbl-battery-elec" text="--V  --A" class="cell-sub" />
             </ui:VisualElement>
-            <ui:VisualElement class="status-group">
-                <ui:Label text="电池" class="status-text" />
-                <ui:ProgressBar name="pb-battery" class="battery-bar" />
+            <!-- 工作模式 -->
+            <ui:VisualElement class="status-cell">
+                <ui:Label text="工作模式" class="cell-label" />
+                <ui:Label name="lbl-mode" text="--" class="mode-badge mode-idle" />
             </ui:VisualElement>
-            <ui:VisualElement class="status-group">
-                <ui:Label name="lbl-datetime" text="2026-02-11 00:00:00" class="status-text status-time" />
+            <!-- 温度 -->
+            <ui:VisualElement class="status-cell status-cell-wide">
+                <ui:Label text="部件温度" class="cell-label" />
+                <ui:Label name="lbl-temp" text="马达:--°  控制:--°  液压:--°" class="cell-value" />
             </ui:VisualElement>
-            <ui:VisualElement class="status-group">
-                <ui:Label name="lbl-warn" class="status-text status-warn" />
+            <!-- 运行时长 -->
+            <ui:VisualElement class="status-cell">
+                <ui:Label text="运行时长" class="cell-label" />
+                <ui:Label name="lbl-uptime" text="--:--:--" class="cell-value" />
+            </ui:VisualElement>
+            <!-- 系统时间 -->
+            <ui:VisualElement class="status-cell status-cell-last">
+                <ui:Label text="系统时间" class="cell-label" />
+                <ui:Label name="lbl-datetime" text="2026-02-11 00:00:00" class="cell-value status-time" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

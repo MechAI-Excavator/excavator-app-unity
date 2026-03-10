@@ -320,7 +320,7 @@ ArticulationBody:
   m_Enabled: 1
   serializedVersion: 5
   m_Mass: 27.88589
-  m_ParentAnchorPosition: {x: 1.9805999, y: 0, z: 0.97567993}
+  m_ParentAnchorPosition: {x: 1.9805999, y: -0.00000011920929, z: 0.97567993}
   m_ParentAnchorRotation: {x: -0.5591626, y: -0.5591569, z: 0.4328279, w: 0.43282896}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
   m_AnchorRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
@@ -840,7 +840,7 @@ Transform:
   m_GameObject: {fileID: 145017720}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.02, y: 1, z: 0.13}
+  m_LocalPosition: {x: 3.42, y: 0.27, z: -4.65}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -2314,6 +2314,37 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   terrain: {fileID: 429505112}
   terrainData: {fileID: 0}
+  elevationGradient:
+    serializedVersion: 2
+    key0: {r: 1, g: 1, b: 1, a: 1}
+    key1: {r: 1, g: 1, b: 1, a: 1}
+    key2: {r: 0, g: 0, b: 0, a: 0}
+    key3: {r: 0, g: 0, b: 0, a: 0}
+    key4: {r: 0, g: 0, b: 0, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 65535
+    ctime2: 0
+    ctime3: 0
+    ctime4: 0
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 2
+    m_NumAlphaKeys: 2
+  colorBands: 6
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -2404,7 +2435,7 @@ Transform:
   m_GameObject: {fileID: 705507993}
   serializedVersion: 2
   m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
-  m_LocalPosition: {x: -1.328, y: 3, z: 0}
+  m_LocalPosition: {x: -0.07, y: 5.67, z: -2.44}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2670,7 +2701,7 @@ ArticulationBody:
   m_Enabled: 1
   serializedVersion: 5
   m_Mass: 26.675142
-  m_ParentAnchorPosition: {x: 0, y: 0.17499995, z: 0.86391}
+  m_ParentAnchorPosition: {x: 0, y: 0.17500007, z: 0.86390996}
   m_ParentAnchorRotation: {x: 0, y: 0, z: -0.7071068, w: 0.7071068}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
   m_AnchorRotation: {x: 0, y: 0, z: -0.7071068, w: 0.7071068}
@@ -2868,7 +2899,7 @@ ArticulationBody:
   m_Enabled: 1
   serializedVersion: 5
   m_Mass: 90.1137
-  m_ParentAnchorPosition: {x: 0, y: 0.21000004, z: 0.47500002}
+  m_ParentAnchorPosition: {x: 0, y: 0.21000001, z: 0.4749999}
   m_ParentAnchorRotation: {x: 0.0000018179417, y: -1.0000001, z: 6.4801498e-12, w: -0.0000036199904}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
   m_AnchorRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
@@ -3537,7 +3568,7 @@ ArticulationBody:
   m_Enabled: 1
   serializedVersion: 5
   m_Mass: 1216.8
-  m_ParentAnchorPosition: {x: 0, y: 0.49, z: 0}
+  m_ParentAnchorPosition: {x: 0, y: 0.48999998, z: 0}
   m_ParentAnchorRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
   m_AnchorRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
@@ -4164,7 +4195,7 @@ ArticulationBody:
   m_Enabled: 1
   serializedVersion: 5
   m_Mass: 29.72862
-  m_ParentAnchorPosition: {x: 0.55724996, y: 0.0000000039245833, z: 1.1312}
+  m_ParentAnchorPosition: {x: 0.55724996, y: -0.000000115284706, z: 1.1312}
   m_ParentAnchorRotation: {x: 0.3574901, y: 0.35749134, z: 0.6100827, w: 0.610082}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
   m_AnchorRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
@@ -5450,7 +5481,7 @@ ArticulationBody:
   m_Enabled: 1
   serializedVersion: 5
   m_Mass: 0.95867795
-  m_ParentAnchorPosition: {x: -0.22013998, y: 0.38, z: 0.44391}
+  m_ParentAnchorPosition: {x: -0.22013998, y: 0.38, z: 0.44391012}
   m_ParentAnchorRotation: {x: 0.0000018179417, y: -1.0000001, z: 6.4801498e-12, w: -0.0000036199904}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
   m_AnchorRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
@@ -5795,7 +5826,7 @@ ArticulationBody:
   m_Enabled: 1
   serializedVersion: 5
   m_Mass: 0.95867956
-  m_ParentAnchorPosition: {x: -0.07258403, y: 0.38, z: 0.43976998}
+  m_ParentAnchorPosition: {x: -0.072583914, y: 0.38, z: 0.43977022}
   m_ParentAnchorRotation: {x: -1.0000001, y: -0.0000018179417, z: 0.0000036199904,
     w: 6.4801498e-12}
   m_AnchorPosition: {x: 0, y: 0, z: 0}

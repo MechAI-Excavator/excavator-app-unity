@@ -262,77 +262,288 @@ TemplateContainer {
     color: var(--color-danger);
 }
 
-/* ---------- 底部状态栏 固定 80px ---------- */
+/* ---------- 底部状态栏 ---------- */
 .bottom-bar {
     height: 80px;
     flex-shrink: 0;
     flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding-left: 16px;
-    padding-right: 16px;
+    align-items: stretch;
     background-color: var(--color-bg-bottom);
     border-top-width: 1px;
     border-top-color: var(--color-border);
 }
 
-.status-group {
+/* ---------- 状态格（仪表格子） ---------- */
+.status-cell {
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 18px;
+    border-right-width: 1px;
+    border-right-color: var(--color-border);
+    min-width: 90px;
+}
+
+/* 宽格，用于任务/故障等内容较多的字段 */
+.status-cell-wide {
+    flex-grow: 1;
+    min-width: 130px;
+}
+
+/* 最右侧格：无右边框，靠右对齐 */
+.status-cell-last {
+    border-right-width: 0;
+    margin-left: auto;
+    -unity-text-align: middle-right;
+}
+
+/* 格内横排辅助行 */
+.cell-row {
     flex-direction: row;
     align-items: center;
-    margin-right: 20px;
 }
 
-.status-text {
-    font-size: 13px;
+/* 格顶部小标签 */
+.cell-label {
+    font-size: 10px;
     color: var(--color-text-secondary);
-    margin-left: 6px;
+    margin-bottom: 5px;
+    -unity-font-style: normal;
 }
 
-.status-time {
+/* 格主值 */
+.cell-value {
+    font-size: 13px;
     color: var(--color-text-primary);
     -unity-font-style: bold;
+    margin-right: 6px;
 }
 
-.status-warn {
-    color: var(--color-danger);
+/* 格次要值（较暗） */
+.cell-value-dim {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-left: 4px;
+}
+
+/* 格第二行小字 */
+.cell-sub {
+    font-size: 10px;
+    color: rgba(155, 161, 173, 0.65);
+    margin-top: 4px;
+}
+
+/* 系统时间用强调色 */
+.status-time {
+    color: var(--color-accent);
     -unity-font-style: bold;
 }
 
-/* ---------- 状态指示灯 ---------- */
-.status-dot-green {
-    width: 10px;
+/* ---------- 任务进度卡片（右侧面板） ---------- */
+.mission-name-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.mission-task-name {
+    font-size: 13px;
+    color: var(--color-text-primary);
+    -unity-font-style: bold;
+    flex-grow: 1;
+}
+
+.mission-pct {
+    font-size: 13px;
+    color: var(--color-accent);
+    -unity-font-style: bold;
+    margin-left: 8px;
+}
+
+.mission-bar-full {
     height: 10px;
-    border-radius: 5px;
-    background-color: var(--color-success);
+    margin-bottom: 8px;
 }
 
-.status-dot-red {
-    width: 10px;
-    height: 10px;
-    border-radius: 5px;
-    background-color: var(--color-danger);
-}
-
-/* ---------- 进度条 — 信号 & 电池 ---------- */
-.signal-bar,
-.battery-bar {
-    width: 80px;
-    height: 14px;
-    margin-left: 6px;
-}
-
-.signal-bar .unity-progress-bar__background,
-.battery-bar .unity-progress-bar__background {
-    background-color: #2a2f38;
-    border-radius: 4px;
+.mission-bar-full .unity-progress-bar__background {
+    background-color: #1e2228;
+    border-radius: 3px;
     border-width: 1px;
     border-color: var(--color-border);
 }
 
-.signal-bar .unity-progress-bar__progress,
+.mission-bar-full .unity-progress-bar__progress {
+    background-color: #3a7bd5;
+    border-radius: 2px;
+}
+
+.mission-meta-row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 2px;
+}
+
+.mission-meta-key {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-right: 6px;
+}
+
+.mission-meta-val {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    -unity-font-style: bold;
+}
+
+/* ---------- 故障列表卡片（右侧面板） ---------- */
+.fault-card-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(240, 165, 0, 0.25);
+}
+
+.fault-count-badge {
+    font-size: 11px;
+    -unity-font-style: bold;
+    border-radius: 10px;
+    padding: 1px 7px;
+    min-width: 22px;
+    -unity-text-align: middle-center;
+}
+
+.fault-count-ok       { color: var(--color-success);        background-color: rgba(53, 199, 89, 0.15);  border-width: 1px; border-color: rgba(53, 199, 89, 0.4); }
+.fault-count-warning  { color: var(--color-warning);        background-color: rgba(240, 165, 0, 0.15); border-width: 1px; border-color: rgba(240, 165, 0, 0.4); }
+.fault-count-error    { color: var(--color-danger);         background-color: rgba(229, 68, 58, 0.15);  border-width: 1px; border-color: rgba(229, 68, 58, 0.4); }
+.fault-count-critical { color: #ffffff; background-color: var(--color-danger); border-width: 0; }
+
+.fault-list {
+    max-height: 260px;
+    flex-shrink: 1;
+}
+
+/* 单条故障行 */
+.fault-item {
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 6px 4px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(58, 63, 74, 0.6);
+}
+
+.fault-item:last-child {
+    border-bottom-width: 0;
+}
+
+/* 严重等级圆点 */
+.fault-item-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 4px;
+    margin-top: 4px;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.fault-dot-warning  { background-color: var(--color-warning); }
+.fault-dot-error    { background-color: var(--color-danger); }
+.fault-dot-critical { background-color: #ff3b30; }
+.fault-dot-info     { background-color: #3a7bd5; }
+
+/* 故障代码 */
+.fault-item-code {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    -unity-font-style: bold;
+    min-width: 38px;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+/* 故障描述 */
+.fault-item-msg {
+    font-size: 12px;
+    color: var(--color-text-primary);
+    white-space: normal;
+    flex-grow: 1;
+}
+
+/* 无故障占位行 */
+.fault-empty {
+    font-size: 12px;
+    color: var(--color-success);
+    padding: 8px 4px;
+    -unity-text-align: middle-center;
+}
+
+/* ---------- 状态指示灯 ---------- */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.status-dot-green { background-color: var(--color-success); }
+.status-dot-red   { background-color: var(--color-danger); }
+
+/* ---------- 工作模式徽标 ---------- */
+.mode-badge {
+    font-size: 12px;
+    -unity-font-style: bold;
+    border-radius: 4px;
+    padding: 2px 8px;
+    align-self: flex-start;
+}
+
+.mode-autonomous { color: #1a1d23; background-color: var(--color-accent); }
+.mode-manual     { color: #ffffff; background-color: #3a7bd5; }
+.mode-remote     { color: #ffffff; background-color: #8e44ad; }
+.mode-idle       { color: var(--color-text-secondary); background-color: #2a2f38; border-width: 1px; border-color: var(--color-border); }
+.mode-error      { color: #ffffff; background-color: var(--color-danger); }
+
+/* ---------- 故障提示 ---------- */
+.fault-normal   { color: var(--color-success); }
+.fault-warning  { color: var(--color-warning); -unity-font-style: bold; }
+.fault-error    { color: var(--color-danger);  -unity-font-style: bold; }
+.fault-critical { color: #ffffff; background-color: var(--color-danger); border-radius: 3px; padding: 2px 6px; -unity-font-style: bold; align-self: flex-start; }
+
+/* ---------- 进度条 — 电池 & 任务 ---------- */
+.battery-bar {
+    width: 80px;
+    height: 10px;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.mission-bar {
+    width: 64px;
+    height: 10px;
+    margin-left: 8px;
+    margin-right: 2px;
+    flex-shrink: 0;
+}
+
+.battery-bar .unity-progress-bar__background,
+.mission-bar .unity-progress-bar__background {
+    background-color: #1e2228;
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: var(--color-border);
+}
+
 .battery-bar .unity-progress-bar__progress {
     background-color: var(--color-success);
-    border-radius: 3px;
+    border-radius: 2px;
+}
+
+.mission-bar .unity-progress-bar__progress {
+    background-color: #3a7bd5;
+    border-radius: 2px;
 }
 
 /* ---------- 滚动条样式 ---------- */
