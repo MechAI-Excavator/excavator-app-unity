@@ -40,8 +40,6 @@ docs/
 MQTT 管理入口：
 - `MqttManager.cs`：连接 broker、订阅、主线程派发、解析消息、抛事件/直调控制器
 
-推荐长期迁移：
-- `Assets/Networking/MQTT/Runtime/MqttManager.cs`
 
 #### `Assets/Networking/MQTT/`
 只存放 `JsonUtility` 使用的 **Serializable DTO**（纯数据结构）。
