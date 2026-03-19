@@ -24,6 +24,12 @@ public class ElevationMetadata
     public string coordinate_system;
     public float min_elevation;
     public float max_elevation;
+
+    // --- Tiling support (optional) ---
+    // If provided, Unity can stream multiple Terrain tiles without changing the topic name.
+    public int tile_x;
+    public int tile_y;
+    public float tile_size_meters;
 }
 
 [Serializable]

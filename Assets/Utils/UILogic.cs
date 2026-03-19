@@ -43,7 +43,7 @@ public class UILogic : MonoBehaviour
         _mqtt = FindFirstObjectByType<MqttManager>();
         if (_mqtt != null)
         {
-            _mqtt.OnConnected    += () => SetConnected(true);
+            _mqtt.OnConnected += () => SetConnected(true);
             _mqtt.OnDisconnected += () => SetConnected(false);
             _mqtt.OnStatusUpdated += OnStatusUpdated;
         }
@@ -59,11 +59,11 @@ public class UILogic : MonoBehaviour
 
     private void BindElements(VisualElement root)
     {
-        _dotConn       = root.Q<VisualElement>("dot-conn");
+        _dotConn = root.Q<VisualElement>("dot-conn");
         _lblConnStatus = root.Q<Label>("lbl-conn-status");
 
-        _pbBattery      = root.Q<ProgressBar>("pb-battery");
-        _lblBatteryPct  = root.Q<Label>("lbl-battery-pct");
+        _pbBattery = root.Q<ProgressBar>("pb-battery");
+        _lblBatteryPct = root.Q<Label>("lbl-battery-pct");
         _lblBatteryElec = root.Q<Label>("lbl-battery-elec");
 
         _lblMode = root.Q<Label>("lbl-mode");
@@ -71,13 +71,13 @@ public class UILogic : MonoBehaviour
         _lblTemp = root.Q<Label>("lbl-temp");
 
         _lblMissionTask = root.Q<Label>("lbl-mission-task");
-        _pbMission      = root.Q<ProgressBar>("pb-mission");
-        _lblMissionPct  = root.Q<Label>("lbl-mission-pct");
-        _lblMissionCmd  = root.Q<Label>("lbl-mission-cmd");
+        _pbMission = root.Q<ProgressBar>("pb-mission");
+        _lblMissionPct = root.Q<Label>("lbl-mission-pct");
+        _lblMissionCmd = root.Q<Label>("lbl-mission-cmd");
 
-        _faultList      = root.Q<ScrollView>("fault-list");
-        _lblFaultCount  = root.Q<Label>("lbl-fault-count");
-        _lblUptime      = root.Q<Label>("lbl-uptime");
+        _faultList = root.Q<ScrollView>("fault-list");
+        _lblFaultCount = root.Q<Label>("lbl-fault-count");
+        _lblUptime = root.Q<Label>("lbl-uptime");
         _lblDatetime = root.Q<Label>("lbl-datetime");
     }
 
@@ -111,14 +111,14 @@ public class UILogic : MonoBehaviour
     {
         if (power == null)
         {
-            SetSafe(_lblBatteryPct,  "--%");
+            SetSafe(_lblBatteryPct, "--%");
             SetSafe(_lblBatteryElec, "--V  --A");
             if (_pbBattery != null) _pbBattery.value = 0f;
             return;
         }
         float pct = Mathf.Clamp(power.battery_level, 0f, 100f);
-        if (_pbBattery != null)  _pbBattery.value = pct;
-        SetSafe(_lblBatteryPct,  $"{pct:0}%");
+        if (_pbBattery != null) _pbBattery.value = pct;
+        SetSafe(_lblBatteryPct, $"{pct:0}%");
         SetSafe(_lblBatteryElec, $"{power.voltage:0.0}V  {power.current:0.0}A");
 
         // 电量低时变红
@@ -151,11 +151,11 @@ public class UILogic : MonoBehaviour
         switch (mode.ToLower())
         {
             case "autonomous": badgeClass = "mode-autonomous"; displayText = "自主"; break;
-            case "manual":     badgeClass = "mode-manual";     displayText = "手动"; break;
-            case "remote":     badgeClass = "mode-remote";     displayText = "遥控"; break;
-            case "idle":       badgeClass = "mode-idle";       displayText = "待机"; break;
-            case "error":      badgeClass = "mode-error";      displayText = "故障"; break;
-            default:           badgeClass = "mode-idle";       displayText = mode;   break;
+            case "manual": badgeClass = "mode-manual"; displayText = "手动"; break;
+            case "remote": badgeClass = "mode-remote"; displayText = "遥控"; break;
+            case "idle": badgeClass = "mode-idle"; displayText = "待机"; break;
+            case "error": badgeClass = "mode-error"; displayText = "故障"; break;
+            default: badgeClass = "mode-idle"; displayText = mode; break;
         }
         _lblMode.text = displayText;
         _lblMode.AddToClassList(badgeClass);
@@ -187,16 +187,16 @@ public class UILogic : MonoBehaviour
         if (mission == null)
         {
             SetSafe(_lblMissionTask, "无任务");
-            SetSafe(_lblMissionPct,  "--%");
-            SetSafe(_lblMissionCmd,  "--");
+            SetSafe(_lblMissionPct, "--%");
+            SetSafe(_lblMissionCmd, "--");
             if (_pbMission != null) _pbMission.value = 0f;
             return;
         }
         float pct = Mathf.Clamp(mission.progress, 0f, 100f);
         SetSafe(_lblMissionTask, string.IsNullOrEmpty(mission.current_task) ? "无任务" : mission.current_task);
         if (_pbMission != null) _pbMission.value = pct;
-        SetSafe(_lblMissionPct,  $"{pct:0}%");
-        SetSafe(_lblMissionCmd,  string.IsNullOrEmpty(mission.command_id) ? "--" : mission.command_id);
+        SetSafe(_lblMissionPct, $"{pct:0}%");
+        SetSafe(_lblMissionCmd, string.IsNullOrEmpty(mission.command_id) ? "--" : mission.command_id);
     }
 
     private void UpdateFaults(FaultItem[] faults)
@@ -261,10 +261,10 @@ public class UILogic : MonoBehaviour
 
     private static int SeverityLevel(string severity) => severity?.ToLower() switch
     {
-        "warning"  => 1,
-        "error"    => 2,
+        "warning" => 1,
+        "error" => 2,
         "critical" => 3,
-        _          => 0
+        _ => 0
     };
 
     private static void SetSafe(Label lbl, string text)

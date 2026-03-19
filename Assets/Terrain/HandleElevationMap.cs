@@ -15,6 +15,15 @@ public class HandleElevationMap : MonoBehaviour
     [Range(4, 8)]
     public int colorBands = 6;
 
+    [Header("Performance")]
+    [Tooltip("关闭可大幅降低卡顿：只更新高度，不重建 TerrainLayer/Alphamap。")]
+    public bool enableColoring = false;
+
+    [Tooltip("是否每次都重建 TerrainLayer（非常耗时）。建议关闭，仅首次初始化。")]
+    public bool rebuildTerrainLayersEveryUpdate = false;
+
+    bool _layersInitialized;
+
     void Reset()
     {
         elevationGradient = CreateDefaultGradient();
@@ -116,9 +125,17 @@ public class HandleElevationMap : MonoBehaviour
         }
 
         td.SetHeights(0, 0, heights);
-        EnsureGradient();
-        InitTerrainLayers(td);
-        ApplyElevationColors(td, normalizedMap, w, h);
+
+        if (enableColoring)
+        {
+            EnsureGradient();
+            if (!_layersInitialized || rebuildTerrainLayersEveryUpdate)
+            {
+                InitTerrainLayers(td);
+                _layersInitialized = true;
+            }
+            ApplyElevationColors(td, normalizedMap, w, h);
+        }
 
         Debug.Log($"[HandleElevationMap] 实际高程范围: {actualMin:F2}m ~ {actualMax:F2}m");
     }

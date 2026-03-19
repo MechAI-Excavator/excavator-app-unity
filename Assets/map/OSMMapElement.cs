@@ -213,7 +213,7 @@ public class OSMMapElement : VisualElement
         if (Map != null) { }
     }
 
- 
+
 
     double Deg2Rad(double d) => d * Math.PI / 180.0;
 
