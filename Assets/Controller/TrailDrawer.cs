@@ -26,7 +26,7 @@ public class TrailDrawer : MonoBehaviour
     [Header("Line appearance")]
     public float lineWidth = 0.2f;
     public Color startColor = new Color(0f, 0.8f, 1f, 1f);
-    public Color endColor   = new Color(0f, 0.8f, 1f, 0.2f);
+    public Color endColor = new Color(0f, 0.8f, 1f, 0.2f);
 
     LineRenderer _lr;
     readonly List<Vector3> _points = new();
@@ -36,11 +36,11 @@ public class TrailDrawer : MonoBehaviour
     {
         _lr = GetComponent<LineRenderer>();
 
-        _lr.useWorldSpace   = true;
-        _lr.positionCount   = 0;
-        _lr.startWidth      = lineWidth;
-        _lr.endWidth        = lineWidth * 0.3f;
-        _lr.numCapVertices  = 4;
+        _lr.useWorldSpace = true;
+        _lr.positionCount = 0;
+        _lr.startWidth = lineWidth;
+        _lr.endWidth = lineWidth * 0.3f;
+        _lr.numCapVertices = 4;
         _lr.numCornerVertices = 4;
 
         ApplyColors();
@@ -104,7 +104,7 @@ public class TrailDrawer : MonoBehaviour
     void ApplyColors()
     {
         _lr.startColor = startColor;
-        _lr.endColor   = endColor;
+        _lr.endColor = endColor;
     }
 
     /// <summary>Clear the trail from code or a UI button.</summary>

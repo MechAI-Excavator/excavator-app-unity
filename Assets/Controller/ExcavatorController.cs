@@ -205,7 +205,7 @@ public class ExcavatorController : MonoBehaviour
         }
         else
         {
-            Vector3    pos = Vector3.Lerp(transform.position, targetPos, positionLerpSpeed * dt);
+            Vector3 pos = Vector3.Lerp(transform.position, targetPos, positionLerpSpeed * dt);
             Quaternion rot = Quaternion.Slerp(transform.rotation, _rtkTargetRot, rotationLerpSpeed * dt);
             transform.SetPositionAndRotation(pos, rot);
         }
