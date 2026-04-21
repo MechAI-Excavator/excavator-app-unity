@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: WSgX4HulW3nw96l74YGHJfvrGSre15RtMPzmN4jvGXdvOgsI+Aibn5E=
+guid: B3kbvS75BnmeB9rW1r+BLkMiqhB7UQTWW83NKnYY+zZsTV0bwAwjnFc=
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -21,7 +21,7 @@ TextureImporter:
     heightScale: 0.25
     normalMapFilter: 0
     flipGreenChannel: 0
-  isReadable: 0
+  isReadable: 1
   webStreaming: 0
   priorityLevel: 0
   uploadedMode: 2
@@ -72,7 +72,7 @@ TextureImporter:
   platformSettings:
   - serializedVersion: 3
     buildTarget: DefaultTexturePlatform
-    maxTextureSize: 4096
+    maxTextureSize: 2048
     maxPlaceholderSize: 32
     resizeAlgorithm: 0
     textureFormat: -1

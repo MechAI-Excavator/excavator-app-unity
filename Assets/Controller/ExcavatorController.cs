@@ -34,6 +34,28 @@ public class ExcavatorController : MonoBehaviour
     [Tooltip("旋转插值速度，越大跟随越快")]
     public float rotationLerpSpeed = 8f;
 
+    [Header("地面吸附")]
+    [Tooltip("开启后：目标高度只从地形采样，忽略 RTK 里的高度（否则与场景地形不一致时会逐渐飘空/入地）")]
+    public bool snapToGround = true;
+
+    [Tooltip("从上方向下打射线时，起点世界 Y（足够高，避免射线起点落在地形下方导致打不中）")]
+    public float raycastTopY = 500f;
+
+    [Tooltip("挖掘机底部到根节点 pivot 的偏移（让底盘刚好贴地，而不是 pivot 贴地）")]
+    public float groundOffset = 0f;
+
+    [Tooltip("竖直方向校正增益（仅用于贴地/高度误差，不宜过大，否则像被托着飞）")]
+    public float groundSnapSpeed = 6f;
+
+    [Tooltip("水平跟随最大速度（m/s），避免像飞机平移")]
+    public float maxHorizontalSpeed = 8f;
+
+    [Tooltip("竖直方向最大速度（m/s），越小越像贴地爬行，越大越像飘")]
+    public float maxVerticalSpeed = 0.6f;
+
+    [Tooltip("最大角速度（rad/s），过大时车身会像陀螺/飘")]
+    public float maxAngularVelocityRad = 2.5f;
+
     private float _targetCabin;
     private float _targetBoom;
     private float _targetStick;
@@ -142,17 +164,82 @@ public class ExcavatorController : MonoBehaviour
     private void ApplyRtkPoseSmooth()
     {
         float dt = Time.fixedDeltaTime;
-        Vector3 pos = Vector3.Lerp(transform.position, _rtkTargetPos, positionLerpSpeed * dt);
-        Quaternion rot = Quaternion.Slerp(transform.rotation, _rtkTargetRot, rotationLerpSpeed * dt);
+
+        // X/Z from RTK. When snapping, ignore RTK altitude — it often drifts vs scene Terrain.
+        Vector3 targetPos = _rtkTargetPos;
+        if (snapToGround)
+            targetPos.y = SampleGroundYAtXZ(targetPos.x, targetPos.z, transform.position.y);
 
         if (_rootBody != null)
         {
-            _rootBody.TeleportRoot(pos, rot);
+            // Horizontal: velocity toward RTK target (XZ only) — feels like driving, not flying.
+            Vector3 posError = targetPos - transform.position;
+            Vector3 horizVel = new Vector3(posError.x, 0f, posError.z) * positionLerpSpeed;
+            float horizMag = horizVel.magnitude;
+            if (horizMag > maxHorizontalSpeed)
+                horizVel = horizVel * (maxHorizontalSpeed / horizMag);
+
+            // Vertical: small PD toward ground height only (never use same gain as horizontal).
+            float vy = Mathf.Clamp(posError.y * groundSnapSpeed, -maxVerticalSpeed, maxVerticalSpeed);
+            if (Mathf.Abs(posError.y) < 0.02f)
+                vy = 0f;
+
+            _rootBody.velocity = new Vector3(horizVel.x, vy, horizVel.z);
+
+            // Angular velocity from rotation error (clamped).
+            Quaternion rotErr = _rtkTargetRot * Quaternion.Inverse(transform.rotation);
+            rotErr.ToAngleAxis(out float angleDeg, out Vector3 axis);
+            if (angleDeg > 180f) angleDeg -= 360f;
+            if (axis.sqrMagnitude > 0.001f)
+            {
+                Vector3 angVel = axis.normalized * (angleDeg * Mathf.Deg2Rad * rotationLerpSpeed);
+                float angMag = angVel.magnitude;
+                if (angMag > maxAngularVelocityRad)
+                    angVel *= maxAngularVelocityRad / angMag;
+                _rootBody.angularVelocity = angVel;
+            }
+            else
+            {
+                _rootBody.angularVelocity = Vector3.zero;
+            }
         }
         else
         {
+            Vector3    pos = Vector3.Lerp(transform.position, targetPos, positionLerpSpeed * dt);
+            Quaternion rot = Quaternion.Slerp(transform.rotation, _rtkTargetRot, rotationLerpSpeed * dt);
             transform.SetPositionAndRotation(pos, rot);
         }
+    }
+
+    /// <summary>
+    /// World Y of ground under (x,z). Uses a high downward ray + prefers TerrainCollider
+    /// so we never pick the excavator's own colliders and never start the ray under the terrain.
+    /// </summary>
+    private float SampleGroundYAtXZ(float x, float z, float fallbackY)
+    {
+        var origin = new Vector3(x, raycastTopY, z);
+        float maxDist = raycastTopY + 200f;
+        var hits = Physics.RaycastAll(origin, Vector3.down, maxDist, Physics.DefaultRaycastLayers,
+            QueryTriggerInteraction.Ignore);
+        if (hits == null || hits.Length == 0)
+            return fallbackY;
+
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (var h in hits)
+        {
+            if (h.collider is TerrainCollider)
+                return h.point.y + groundOffset;
+        }
+
+        // Fallback: first hit that is not this vehicle (avoid ray hitting own mesh).
+        foreach (var h in hits)
+        {
+            if (!h.collider.transform.IsChildOf(transform))
+                return h.point.y + groundOffset;
+        }
+
+        return fallbackY;
     }
 
     /// <summary>
