@@ -290,6 +290,13 @@ public class MqttManager : MonoBehaviour
                 Debug.LogWarning("[MQTT] 高程图 JSON 解析失败或数据为空");
                 return;
             }
+            var tileManager = FindFirstObjectByType<TerrainTileManager>();
+            if (tileManager != null)
+            {
+                tileManager.OnElevationTile(elevation);
+                return;
+            }
+
             var handler = FindFirstObjectByType<HandleElevationMap>();
             if (handler != null)
                 handler.OnElevationDataReceived(elevation);

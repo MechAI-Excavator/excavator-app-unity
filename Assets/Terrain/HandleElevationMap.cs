@@ -100,6 +100,10 @@ public class HandleElevationMap : MonoBehaviour
     [Tooltip("每帧最大高度变化（归一化值，0.001 ≈ 0.6cm/frame @30fps，足够平滑）")]
     public float maxHeightDeltaPerFrame = 0.002f;
 
+    [Header("Data Orientation")]
+    [Tooltip("后端栅格坐标方向与 Unity Terrain X/Z 相反时开启。等价于把整张高程图旋转 180 度后再写入 Terrain。")]
+    public bool rotateData180 = true;
+
     bool _layersInitialized;
     Coroutine _smoothCoroutine;
 
@@ -208,7 +212,7 @@ public class HandleElevationMap : MonoBehaviour
         {
             for (int x = 0; x < w; x++)
             {
-                int raw = msg.data[y * w + x];
+                int raw = msg.data[GetDataIndex(x, y, w, h)];
                 if (raw == NODATA) raw = rawMin;
 
                 float meters = raw * hr;
@@ -284,6 +288,16 @@ public class HandleElevationMap : MonoBehaviour
         }
 
         Debug.Log($"[HandleElevationMap] 实际高程范围: {actualMin:F2}m ~ {actualMax:F2}m");
+    }
+
+    int GetDataIndex(int x, int y, int width, int height)
+    {
+        if (!rotateData180)
+            return y * width + x;
+
+        int srcX = width - 1 - x;
+        int srcY = height - 1 - y;
+        return srcY * width + srcX;
     }
 
     void NotifyTerrainHeightmapReady()

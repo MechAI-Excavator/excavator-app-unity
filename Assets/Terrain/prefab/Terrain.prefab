@@ -163,3 +163,4 @@ MonoBehaviour:
   baseAlbedoIsSRGB: 1
   smoothHeightUpdates: 1
   maxHeightDeltaPerFrame: 0.001
+  rotateData180: 1

@@ -11,9 +11,9 @@ public class TerrainTileManager : MonoBehaviour
     [Tooltip("Tile size in meters (Unity units if 1 unit = 1 meter). Must match backend tiling.")]
     public float tileSizeMeters = 50f;
 
-    [Tooltip("Active radius in tiles. 1 => 3x3, 2 => 5x5.")]
+    [Tooltip("Active radius in tiles. 0 => single tile, 1 => 3x3, 2 => 5x5.")]
     [Range(0, 4)]
-    public int activeRadius = 1;
+    public int activeRadius = 0;
 
     [Header("Terrain prefab")]
     [Tooltip("Prefab with Terrain + TerrainCollider + HandleElevationMap attached. The HandleElevationMap.terrain should reference its own Terrain.")]
@@ -136,18 +136,34 @@ public class TerrainTileManager : MonoBehaviour
     {
         if (msg?.metadata == null) return;
 
-        // Use message-provided tiling values if present
-        if (msg.metadata.tile_size_meters > 0.1f)
-            tileSizeMeters = msg.metadata.tile_size_meters;
+        bool hasExplicitTile = msg.metadata.tile_size_meters > 0.1f;
+        float messageSize = GetMessageSizeMeters(msg);
+        if (messageSize > 0.1f)
+            tileSizeMeters = messageSize;
 
-        var key = new Vector2Int(msg.metadata.tile_x, msg.metadata.tile_y);
+        Vector2Int key;
+        if (hasExplicitTile)
+        {
+            key = new Vector2Int(msg.metadata.tile_x, msg.metadata.tile_y);
+        }
+        else
+        {
+            if (!_centerInitialized)
+            {
+                _centerTile = followTarget != null ? WorldToTile(followTarget.position) : Vector2Int.zero;
+                _centerInitialized = true;
+                RefreshActiveSet();
+            }
+            key = _centerTile;
+        }
 
-        store?.Put(key.x, key.y, msg);
+        if (hasExplicitTile)
+            store?.Put(key.x, key.y, msg);
 
-        // Ensure tile is active (center around it if we don't have a followTarget)
+        // Ensure tile is active (center around it if we don't have a followTarget).
         if (followTarget == null)
         {
-            if (!_centerInitialized || key != _centerTile)
+            if (!_centerInitialized || key != _centerTile || _active.Count == 0)
             {
                 _centerTile = key;
                 _centerInitialized = true;
@@ -302,7 +318,7 @@ public class TerrainTileManager : MonoBehaviour
         // Ensure physical tile size matches placement spacing
         if (terrain.terrainData != null && msg?.metadata != null)
         {
-            float size = msg.metadata.tile_size_meters > 0.1f ? msg.metadata.tile_size_meters : 0f;
+            float size = GetMessageSizeMeters(msg);
             if (size > 0.1f)
             {
                 var s = terrain.terrainData.size;
@@ -321,5 +337,17 @@ public class TerrainTileManager : MonoBehaviour
         applier.terrainData = null;
         applier.OnElevationDataReceived(msg);
     }
-}
 
+    static float GetMessageSizeMeters(ElevationMsg msg)
+    {
+        if (msg?.metadata == null) return 0f;
+        if (msg.metadata.tile_size_meters > 0.1f)
+            return msg.metadata.tile_size_meters;
+
+        float resolution = msg.metadata.resolution;
+        if (resolution <= 0f) return 0f;
+
+        int samples = Mathf.Max(msg.metadata.width, msg.metadata.height);
+        return samples > 0 ? samples * resolution : 0f;
+    }
+}
