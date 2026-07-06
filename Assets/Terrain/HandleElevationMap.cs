@@ -14,7 +14,10 @@ public class HandleElevationMap : MonoBehaviour
 
     [Tooltip("着色层数，越多过渡越平滑")]
     [Range(4, 8)]
-    public int colorBands = 6;
+    public int colorBands = 8;
+
+    [Tooltip("使用不受太阳、环境光和反射影响的高程色图材质。效果最接近 VertexColorUnlit。")]
+    public bool useUnlitHeightMaterial = true;
 
     [Header("Performance")]
     [Tooltip("打开：按高度染色（建议开启）。关闭：只写高度，不做 alphamap，性能最好。")]
@@ -31,7 +34,7 @@ public class HandleElevationMap : MonoBehaviour
 
     [Header("Surface Look")]
     [Tooltip("在每个高度色带的贴图上叠加栅格线（更有工程/测绘质感）。")]
-    public bool overlayGridTexture = true;
+    public bool overlayGridTexture = false;
 
     [Tooltip("生成的栅格贴图分辨率（越大越细腻，但创建略慢；通常 64 或 128 足够）。")]
     [Range(16, 512)]
@@ -51,7 +54,7 @@ public class HandleElevationMap : MonoBehaviour
 
     [Tooltip("在纯色底上加入少量噪声（0=无），避免过于塑料。")]
     [Range(0f, 1f)]
-    public float surfaceNoiseStrength = 0.1f;
+    public float surfaceNoiseStrength = 0f;
 
     [Tooltip("让栅格线更锐利（Point 采样），关闭则更平滑（Bilinear）。")]
     public bool crispGridLines = true;
@@ -61,7 +64,7 @@ public class HandleElevationMap : MonoBehaviour
     public float gridRepeatMeters = 2f;
 
     [Tooltip("为地表自动生成法线贴图（建议开启，会显著降低“光滑假”的感觉）。")]
-    public bool generateSurfaceNormalMap = true;
+    public bool generateSurfaceNormalMap = false;
 
     [Tooltip("法线强度（越大越“粗糙”）。")]
     [Range(0f, 4f)]
@@ -77,7 +80,10 @@ public class HandleElevationMap : MonoBehaviour
 
     [Tooltip("整体亮度系数（>1 更亮，<1 更暗）。")]
     [Range(0.5f, 2f)]
-    public float surfaceBrightness = 1.15f;
+    public float surfaceBrightness = 1f;
+
+    [Tooltip("使用 Legacy Diffuse 地形材质并关闭反射探针，彻底移除 PBR 镜面高光。")]
+    public bool matteSurface = true;
 
     [Header("Real material (optional)")]
     [Tooltip("基础地表 Albedo（可平铺）。设置后将用真实贴图叠加高度分色 tint，而不是纯色底。")]
@@ -88,7 +94,7 @@ public class HandleElevationMap : MonoBehaviour
 
     [Tooltip("高度分色 tint 强度：0=完全原始土贴图，1=完全用渐变色覆盖。建议 0.25~0.55。")]
     [Range(0f, 1f)]
-    public float heightTintStrength = 0.45f;
+    public float heightTintStrength = 1f;
 
     [Tooltip("基础贴图采样的色彩空间：一般 Albedo 用 sRGB（保持开启）。")]
     public bool baseAlbedoIsSRGB = true;
@@ -106,6 +112,8 @@ public class HandleElevationMap : MonoBehaviour
 
     bool _layersInitialized;
     Coroutine _smoothCoroutine;
+    Material _unlitHeightMaterial;
+    Texture2D _unlitHeightTexture;
 
     void Reset()
     {
@@ -115,6 +123,27 @@ public class HandleElevationMap : MonoBehaviour
     void Awake()
     {
         EnsureGradient();
+        ApplySurfaceRenderSettings();
+    }
+
+    void ApplySurfaceRenderSettings()
+    {
+        if (terrain == null) return;
+
+        if (matteSurface || useUnlitHeightMaterial)
+            terrain.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+
+        if (useUnlitHeightMaterial)
+        {
+            EnsureUnlitHeightMaterial();
+            return;
+        }
+
+        if (!matteSurface) return;
+
+#pragma warning disable 618
+        terrain.materialType = Terrain.MaterialType.BuiltInLegacyDiffuse;
+#pragma warning restore 618
     }
 
     void EnsureGradient()
@@ -132,15 +161,18 @@ public class HandleElevationMap : MonoBehaviour
     static Gradient CreateDefaultGradient()
     {
         var g = new Gradient();
+        g.mode = GradientMode.Blend;
         g.SetKeys(
             new[]
             {
-                new GradientColorKey(new Color(0.50f, 0.00f, 0.75f), 0.00f),  // 紫色 — 最低
-                new GradientColorKey(new Color(0.00f, 0.10f, 0.65f), 0.20f),  // 深蓝
-                new GradientColorKey(new Color(0.00f, 0.40f, 1.00f), 0.40f),  // 蓝色 — 平面基准
-                new GradientColorKey(new Color(0.15f, 0.80f, 0.15f), 0.65f),  // 绿色
-                new GradientColorKey(new Color(0.90f, 0.70f, 0.00f), 0.85f),  // 橙黄
-                new GradientColorKey(new Color(0.85f, 0.12f, 0.00f), 1.00f),  // 红色 — 最高
+                new GradientColorKey((Color)new Color32(0x57, 0x00, 0x63, 0xff), 0f / 7f),
+                new GradientColorKey((Color)new Color32(0x00, 0x10, 0x48, 0xff), 1f / 7f),
+                new GradientColorKey((Color)new Color32(0x00, 0x46, 0x9a, 0xff), 2f / 7f),
+                new GradientColorKey((Color)new Color32(0x00, 0xa2, 0xa8, 0xff), 3f / 7f),
+                new GradientColorKey((Color)new Color32(0x00, 0xff, 0x6e, 0xff), 4f / 7f),
+                new GradientColorKey((Color)new Color32(0x97, 0xfa, 0x00, 0xff), 5f / 7f),
+                new GradientColorKey((Color)new Color32(0xff, 0xf3, 0x00, 0xff), 6f / 7f),
+                new GradientColorKey((Color)new Color32(0xff, 0x05, 0x00, 0xff), 7f / 7f),
             },
             new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) }
         );
@@ -151,6 +183,9 @@ public class HandleElevationMap : MonoBehaviour
     public void OnElevationDataReceived(ElevationMsg msg)
     {
         if (msg.data_type != "int16") return;
+
+        // TerrainTileManager may assign the Terrain reference after Awake.
+        ApplySurfaceRenderSettings();
 
         int w = msg.metadata.width;
         int h = msg.metadata.height;
@@ -270,13 +305,7 @@ public class HandleElevationMap : MonoBehaviour
 
         if (enableColoring)
         {
-            EnsureGradient();
-            if (!_layersInitialized || rebuildTerrainLayersEveryUpdate)
-            {
-                InitTerrainLayers(td);
-                _layersInitialized = true;
-            }
-            ApplyElevationColors(td, normalizedMap, w, h);
+            ApplyColoring(td, normalizedMap, w, h);
 
             if (!_loggedOnce)
             {
@@ -346,18 +375,105 @@ public class HandleElevationMap : MonoBehaviour
 
         // Apply coloring once heights have fully settled.
         if (enableColoring)
-        {
-            EnsureGradient();
-            if (!_layersInitialized || rebuildTerrainLayersEveryUpdate)
-            {
-                InitTerrainLayers(td);
-                _layersInitialized = true;
-            }
-            ApplyElevationColors(td, normalizedMap, dataW, dataH);
-        }
+            ApplyColoring(td, normalizedMap, dataW, dataH);
 
         NotifyTerrainHeightmapReady();
         _smoothCoroutine = null;
+    }
+
+    void ApplyColoring(TerrainData td, float[,] normalizedMap, int dataW, int dataH)
+    {
+        EnsureGradient();
+
+        if (useUnlitHeightMaterial && ApplyUnlitHeightColors(normalizedMap, dataW, dataH))
+            return;
+
+        if (!_layersInitialized || rebuildTerrainLayersEveryUpdate)
+        {
+            InitTerrainLayers(td);
+            _layersInitialized = true;
+        }
+        ApplyElevationColors(td, normalizedMap, dataW, dataH);
+    }
+
+    bool ApplyUnlitHeightColors(float[,] normalizedMap, int dataW, int dataH)
+    {
+        if (!EnsureUnlitHeightMaterial()) return false;
+
+        int texW = Mathf.Max(2, dataW);
+        int texH = Mathf.Max(2, dataH);
+        if (_unlitHeightTexture == null
+            || _unlitHeightTexture.width != texW
+            || _unlitHeightTexture.height != texH)
+        {
+            if (_unlitHeightTexture != null)
+                Destroy(_unlitHeightTexture);
+
+            _unlitHeightTexture = new Texture2D(texW, texH, TextureFormat.RGBA32, true, false)
+            {
+                name = $"{name}_HeightColors",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                anisoLevel = 0
+            };
+        }
+
+        var pixels = new Color[texW * texH];
+        for (int y = 0; y < texH; y++)
+        {
+            int sourceY = Mathf.Clamp(y, 0, dataH - 1);
+            for (int x = 0; x < texW; x++)
+            {
+                int sourceX = Mathf.Clamp(x, 0, dataW - 1);
+                pixels[y * texW + x] = elevationGradient.Evaluate(normalizedMap[sourceY, sourceX]);
+            }
+        }
+        _unlitHeightTexture.SetPixels(pixels);
+        _unlitHeightTexture.Apply(true, false);
+
+        _unlitHeightMaterial.SetTexture("_HeightColorMap", _unlitHeightTexture);
+        return true;
+    }
+
+    bool EnsureUnlitHeightMaterial()
+    {
+        if (terrain == null) return false;
+
+        var shader = Shader.Find("Custom/TerrainHeightUnlit");
+        if (shader == null)
+        {
+            Debug.LogWarning("[HandleElevationMap] Custom/TerrainHeightUnlit shader not found; using TerrainLayers.");
+            return false;
+        }
+
+        if (_unlitHeightMaterial == null || _unlitHeightMaterial.shader != shader)
+        {
+            if (_unlitHeightMaterial != null)
+                Destroy(_unlitHeightMaterial);
+
+            _unlitHeightMaterial = new Material(shader)
+            {
+                name = $"{name}_UnlitHeightMaterial",
+                hideFlags = HideFlags.DontSave
+            };
+        }
+
+#pragma warning disable 618
+        terrain.materialType = Terrain.MaterialType.Custom;
+#pragma warning restore 618
+        terrain.materialTemplate = _unlitHeightMaterial;
+        terrain.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+        // This lightweight shader reads the Terrain mesh UV directly.
+        terrain.drawInstanced = false;
+        return true;
+    }
+
+    void OnDestroy()
+    {
+        if (_unlitHeightMaterial != null)
+            Destroy(_unlitHeightMaterial);
+        if (_unlitHeightTexture != null)
+            Destroy(_unlitHeightTexture);
     }
 
     void InitTerrainLayers(TerrainData td)
@@ -488,6 +604,12 @@ public class HandleElevationMap : MonoBehaviour
 
             var layer = new TerrainLayer();
             layer.diffuseTexture = tex;
+            if (matteSurface)
+            {
+                layer.smoothness = 0f;
+                layer.metallic = 0f;
+                layer.specular = Color.black;
+            }
             if (baseNormal != null)
             {
                 layer.normalMapTexture = baseNormal;

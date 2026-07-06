@@ -25,11 +25,9 @@ public class OSMMapController : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[OSM] Container 'overpass-map' not found in UI, attaching to root");
-            if (doc != null)
-            {
-                doc.rootVisualElement.Add(mapElement);
-            }
+            Debug.LogWarning("[OSM] Container 'overpass-map' not found; map UI is disabled.");
+            enabled = false;
+            return;
         }
 
         // Build 下不要用 Application.dataPath 直接读工程文件。
