@@ -734,3 +734,295 @@ TemplateContainer {
     justify-content: center;
     align-items: center;
 }
+
+/* ============================================================
+   Remote-control frame matching the new 16:9 UI design.
+   ============================================================ */
+
+.remote-root {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.remote-screen {
+    flex-grow: 1;
+    position: relative;
+    background-color: rgba(0, 0, 0, 0);
+    overflow: hidden;
+}
+
+.remote-title {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    translate: -50% 0;
+    min-width: 168px;
+    height: 42px;
+    padding-left: 26px;
+    padding-right: 26px;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(10, 8, 12, 0.58);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-left-color: rgba(255, 255, 255, 0.08);
+    border-right-color: rgba(255, 255, 255, 0.08);
+}
+
+.remote-title-text {
+    color: #ffffff;
+    font-size: 24px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    letter-spacing: 0;
+}
+
+.view-tabs {
+    position: absolute;
+    top: 38px;
+    left: 19.2%;
+    height: 36px;
+    flex-direction: row;
+    align-items: center;
+}
+
+.view-tab {
+    height: 34px;
+    padding-left: 16px;
+    padding-right: 16px;
+    margin-right: 6px;
+    color: rgba(255, 255, 255, 0.42);
+    background-color: rgba(5, 10, 18, 0.52);
+    border-radius: 17px;
+    font-size: 15px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.view-tab--active {
+    color: #ffffff;
+    background-color: rgba(15, 22, 32, 0.82);
+}
+
+.settings-button {
+    position: absolute;
+    top: 45px;
+    right: 48px;
+    width: 42px;
+    height: 42px;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 38px;
+    -unity-text-align: middle-center;
+}
+
+.glass-card {
+    background-color: rgba(5, 10, 18, 0.82);
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+}
+
+.panel-heading {
+    height: 32px;
+    margin-left: 18px;
+    margin-top: 10px;
+    color: #ffffff;
+    font-size: 17px;
+    -unity-font-style: bold;
+}
+
+.map-card {
+    position: absolute;
+    top: 28px;
+    left: 30px;
+    width: 340px;
+    height: 338px;
+    padding-bottom: 18px;
+}
+
+.webview-slot {
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.map-webview {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    top: 78px;
+    bottom: 18px;
+    background-color: rgba(18, 22, 27, 0.82);
+}
+
+.webview-placeholder {
+    color: rgba(255, 255, 255, 0.28);
+    font-size: 13px;
+    -unity-text-align: middle-center;
+    flex-grow: 1;
+}
+
+.indicator-stack {
+    position: absolute;
+    left: 70px;
+    bottom: 48px;
+    width: 430px;
+    height: 510px;
+}
+
+.indicator {
+    position: absolute;
+    overflow: visible;
+}
+
+.indicator-image {
+    position: absolute;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.direction-indicator {
+    left: 0;
+    top: 0;
+    width: 260px;
+    height: 260px;
+}
+
+.indicator-outer {
+    left: 0;
+    top: 0;
+    width: 260px;
+    height: 260px;
+    background-image: resource("Outer_layer_indication");
+}
+
+.indicator-horizontal {
+    left: 16px;
+    top: 16px;
+    width: 228px;
+    height: 228px;
+    background-image: resource("direction_horizontal_indication");
+}
+
+.indicator-forward {
+    left: 58px;
+    top: 22px;
+    width: 144px;
+    height: 122px;
+    background-image: resource("direction_forwar_indication");
+}
+
+.heading-indicator {
+    left: 0;
+    top: 280px;
+    width: 230px;
+    height: 230px;
+}
+
+.heading-outer {
+    left: 0;
+    top: 0;
+    width: 230px;
+    height: 230px;
+    background-image: resource("Outer_layer_indication");
+}
+
+.heading-inner {
+    left: 48px;
+    top: 36px;
+    width: 134px;
+    height: 136px;
+    background-image: resource("excavator_inner");
+}
+
+.pitch-indicator {
+    left: 270px;
+    top: 356px;
+    width: 120px;
+    height: 107px;
+}
+
+.pitch-image {
+    left: 0;
+    top: 0;
+    width: 120px;
+    height: 107px;
+    background-image: resource("Outer_layer_indication_bottom_right");
+}
+
+.arm-card {
+    position: absolute;
+    right: 70px;
+    bottom: 46px;
+    width: 300px;
+    height: 260px;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.arm-webview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    height: 150px;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.arm-readouts {
+    position: absolute;
+    left: 94px;
+    right: 0;
+    bottom: 4px;
+    height: 92px;
+}
+
+.arm-row {
+    height: 30px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.arm-key {
+    width: 92px;
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 14px;
+    -unity-text-align: middle-left;
+}
+
+.arm-value {
+    min-width: 70px;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 14px;
+    -unity-text-align: middle-right;
+}
+
+.bottom-tools {
+    position: absolute;
+    left: 50%;
+    bottom: 24px;
+    translate: -50% 0;
+    height: 42px;
+    min-width: 208px;
+    padding-left: 10px;
+    padding-right: 10px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(5, 10, 18, 0.76);
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.tool-icon {
+    width: 36px;
+    height: 34px;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 20px;
+    -unity-text-align: middle-center;
+}
+
+.tool-icon--active {
+    color: #ffffff;
+}

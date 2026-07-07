@@ -1,0 +1,269 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta name="keywords" content="天地图"/>
+    <title>天地图</title>
+    <meta name="referrer" content="origin-when-cross-origin" />
+    <script>
+        var timer = null;
+        window.addEventListener('DOMContentLoaded', () => {
+            timer = setTimeout(() => {
+                const findCopyright = document.body.querySelector('.tdt-bottom');
+                if (findCopyright) {
+                   findCopyright.style.opacity = '0';
+                   clearTimeout(timer);
+                }
+            }, 500);
+        });
+
+        window.addEventListener('unload', () => {
+            clearTimeout(timer);
+        });
+
+        window.addEventListener('beforeunload', () => {
+            clearTimeout(timer);
+        });
+    </script>
+    <style type="text/css">body,html{width:100%;height:100%;margin:0;font-family:"Microsoft YaHei";background:transparent}#mapDiv{width:100%;height:100%;min-height:120px;border-radius:10px;overflow:hidden}#mapStatus{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.76);font:13px/1.4 "Microsoft YaHei",sans-serif;background:rgba(8,12,18,.42);pointer-events:none}input,b,p{margin-left:5px;font-size:14px}</style>
+    <script>
+        var map;
+        var zoom = 15;
+        var DEFAULT_LAT = 28.2416021;
+        var DEFAULT_LNG = 113.0938459;
+        var DEFAULT_HEADING = 0;
+        var NATIVE_POSE_PENDING = null;
+        var LAST_POSE = { lat: NaN, lng: NaN, heading: NaN };
+        var TIANDITU_API_URL = 'https://api.tianditu.gov.cn/api?v=4.0&tk=5374efdf7216f82394d5c814436b1fa0';
+        // ~1e-6 度 ≈ 0.1m。仅当真实位移超过该阈值才更新 marker；否则不动 DOM、不重排，
+        // 避免与 FPV TextureView 抢同一份 GPU/合成预算导致规律性掉帧。
+        var POSE_EPS = 1e-6;
+        window.TiandituBridge = {
+            setVehiclePose: function (lat, lng, headingDeg) {
+                var la = parseFloat(lat);
+                var ln = parseFloat(lng);
+                var he = parseFloat(headingDeg);
+                if (!isFinite(la)) la = DEFAULT_LAT;
+                if (!isFinite(ln)) ln = DEFAULT_LNG;
+                if (!isFinite(he)) he = DEFAULT_HEADING;
+                if (!map || !window.mapMarker) {
+                    NATIVE_POSE_PENDING = { lat: la, lng: ln, heading: he };
+                    return;
+                }
+                // 与上次姿态完全一致 → 跳过整个 DOM 更新（Android 模拟模式会每秒原样回灌）。
+                var sameLatLng =
+                    isFinite(LAST_POSE.lat) && isFinite(LAST_POSE.lng)
+                    && Math.abs(la - LAST_POSE.lat) < POSE_EPS
+                    && Math.abs(ln - LAST_POSE.lng) < POSE_EPS;
+                var sameHeading =
+                    isFinite(LAST_POSE.heading)
+                    && Math.abs(he - LAST_POSE.heading) < 0.05;
+                if (sameLatLng && sameHeading) {
+                    return;
+                }
+                LAST_POSE.lat = la;
+                LAST_POSE.lng = ln;
+                LAST_POSE.heading = he;
+
+                var ll = new T.LngLat(ln, la);
+                window.mapMarker.setLngLat(ll);
+                if (!sameHeading) window.setMarkerHeading(he);
+                // 只有当车辆 marker 真正漂到可见区边缘附近时才 centerAndZoom；否则 setLngLat 已足够，
+                // 避免每帧 centerAndZoom 触发瓦片可见性扫描 + 内部 layout，挤占 FPV 解码/合成。
+                try {
+                    if (!sameLatLng && map.getBounds && shouldRecenter(ll)) {
+                        var z = typeof map.getZoom === 'function' ? map.getZoom() : zoom;
+                        map.centerAndZoom(ll, z);
+                    }
+                } catch (ignore) {}
+            }
+        };
+        function setMapStatus(text, hidden) {
+            var el = document.getElementById('mapStatus');
+            if (!el) return;
+            el.textContent = text || '';
+            el.style.display = hidden ? 'none' : 'flex';
+        }
+        function loadTiandituApi() {
+            setMapStatus('地图加载中...', false);
+            if (typeof T !== 'undefined') {
+                onLoad();
+                return;
+            }
+
+            var script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = TIANDITU_API_URL;
+            script.onload = function () {
+                setMapStatus('地图初始化...', false);
+                onLoad();
+            };
+            script.onerror = function () {
+                console.error('Tianditu api script failed to load:', TIANDITU_API_URL);
+                setMapStatus('地图服务加载失败', false);
+            };
+            document.head.appendChild(script);
+        }
+        function shouldRecenter(ll) {
+            try {
+                var b = map.getBounds();
+                if (!b) return true;
+                var sw = b.getSouthWest();
+                var ne = b.getNorthEast();
+                if (!sw || !ne) return true;
+                // 当 marker 越界，或距任一边小于可视框 15% 时再 recenter
+                var width = Math.abs(ne.getLng() - sw.getLng());
+                var height = Math.abs(ne.getLat() - sw.getLat());
+                var marginX = width * 0.15;
+                var marginY = height * 0.15;
+                return ll.getLng() < sw.getLng() + marginX
+                    || ll.getLng() > ne.getLng() - marginX
+                    || ll.getLat() < sw.getLat() + marginY
+                    || ll.getLat() > ne.getLat() - marginY;
+            } catch (e) {
+                return true;
+            }
+        }
+        var MAP_INIT_ATTEMPTS = 0;
+        var MAP_INIT_MAX = 120; // ~6s @ 50ms，等外链天地图脚本注入全局 T
+        function onLoad() {
+            if (typeof T === 'undefined') {
+                if (MAP_INIT_ATTEMPTS++ < MAP_INIT_MAX) {
+                    setTimeout(onLoad, 50);
+                } else {
+                    console.error('Tianditu API (T) not available: script blocked, offline, or load order issue');
+                    setMapStatus('地图服务不可用', false);
+                }
+                return;
+            }
+            if (map) {
+                return;
+            }
+            map = new T.Map('mapDiv', {
+                projection: 'EPSG:4326'
+            });
+            map.centerAndZoom(new T.LngLat(DEFAULT_LNG, DEFAULT_LAT), zoom);
+            map.setStyle('black');
+            setMapStatus('', true);
+            var w = 45;
+            var h = 45;
+            var icon = new T.Icon({
+                iconUrl: new URL('location_current.png', window.location.href).href,
+                iconSize: new T.Point(w, h),
+                // 正方形导航箭头：锚点与旋转轴都用中心，避免绕底边“甩动”
+                iconAnchor: new T.Point(Math.floor(w / 2), Math.floor(h / 2)),
+            });
+
+            var marker = new T.Marker(new T.LngLat(DEFAULT_LNG, DEFAULT_LAT), { icon: icon });
+            map.addOverLay(marker);
+
+            var lastHeading = 0;
+            function applyMarkerHeading() {
+                var el = marker.getElement();
+                if (!el) return;
+                var p = el._tdt_pos;
+                if (!p) return;
+                var deg = lastHeading;
+                el.style.transformOrigin = '50% 50%';
+                if (T.oQ.any3d) {
+                    var tr = T.oQ.ie3d
+                        ? 'translate(' + p.x + 'px,' + p.y + 'px)'
+                        : 'translate3d(' + p.x + 'px,' + p.y + 'px,0)';
+                    el.style[T._Q.uq] = tr + ' rotate(' + deg + 'deg)';
+                } else {
+                    el.style.transformOrigin = '50% 50%';
+                    el.style.left = p.x + 'px';
+                    el.style.top = p.y + 'px';
+                    el.style[T._Q.uq] = 'rotate(' + deg + 'deg)';
+                }
+            }
+            function scheduleApplyMarkerHeading() {
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(applyMarkerHeading);
+                });
+            }
+            window.mapMarker = marker;
+            window.setMarkerHeading = function (deg) {
+                lastHeading = Number(deg) || 0;
+                applyMarkerHeading();
+            };
+            // 不在每次 move 上改 DOM transform：WebView 上与天地图内部更新易打架，出现闪一下后标注异常/消失。
+            map.on('moveend', scheduleApplyMarkerHeading);
+            map.on('zoomend', scheduleApplyMarkerHeading);
+            setTimeout(applyMarkerHeading, 0);
+            if (NATIVE_POSE_PENDING) {
+                var q = NATIVE_POSE_PENDING;
+                NATIVE_POSE_PENDING = null;
+                window.mapMarker.setLngLat(new T.LngLat(q.lng, q.lat));
+                window.setMarkerHeading(q.heading);
+            }
+        }
+    </script>
+</head>
+<body onLoad="loadTiandituApi()">
+<style>
+    /*
+     * 让整个 WebView 真正「贴在」外层 Android BlurView (rightPanelBlur,
+     * 0x4D808080 frost) 上：
+     *
+     * 1) html / body / mapDiv / 天地图运行时插入的所有 pane 容器全部 background: transparent，
+     *    任何 opaque 容器都会把 BlurView 挡死。
+     * 2) 瓦片本质是不透明 JPEG，CSS 没法把「黑像素」单独转成 alpha=0；
+     *    只能用 invert(1) 把 setStyle('black') 的深底翻成浅底，再用统一 opacity
+     *    让外层毛玻璃灰 frost 透上来约 45%，视觉上接近「半透明地图贴在毛玻璃上」。
+     * 3) marker / 控件不在 tile-pane 里，单独把它们的 opacity / filter 复位，
+     *    避免航向箭头被反色和半透明化。
+     */
+    html, body {
+        margin: 0;
+        background: transparent !important;
+    }
+
+    #mapDiv,
+    #mapDiv .tdt-container,
+    #mapDiv .tdt-map-pane,
+    #mapDiv .tdt-tile-pane,
+    #mapDiv .tdt-layer,
+    #mapDiv .tdt-overlay-pane,
+    #mapDiv .tdt-shadow-pane,
+    #mapDiv .tdt-popup-pane,
+    #mapDiv .tdt-objects-pane {
+        background: transparent !important;
+    }
+
+    /* 整张 tile-pane 一起降不透明度，让外层 BlurView 灰 frost 透出 ~45% */
+    #mapDiv .tdt-tile-pane {
+        opacity: 0.55;
+    }
+
+    /* tile 反色 + 略低饱和：黑底蓝线 → 浅底冷暖中间色，配毛玻璃灰更协调 */
+    #mapDiv .tdt-tile-pane img,
+    #mapDiv .tdt-layer img {
+        filter: invert(1) brightness(1.1) saturate(0.55) contrast(0.95);
+        -webkit-filter: invert(1) brightness(1.1) saturate(0.55) contrast(0.95);
+    }
+
+    /*
+     * marker / 矢量 overlay / 控件层：复位 opacity 和 filter，
+     * 否则 location_current.png 箭头会被上面的 invert + 0.55 opacity 一起作用，
+     * 看不清且颜色不对。
+     */
+    #mapDiv .tdt-marker-pane,
+    #mapDiv .tdt-marker-pane *,
+    #mapDiv .tdt-overlay-pane,
+    #mapDiv .tdt-overlay-pane *,
+    #mapDiv .tdt-objects-pane,
+    #mapDiv .tdt-objects-pane *,
+    #mapDiv .tdt-control-container,
+    #mapDiv .tdt-control-container * {
+        opacity: 1 !important;
+        filter: none !important;
+        -webkit-filter: none !important;
+        mix-blend-mode: normal !important;
+    }
+</style>
+<div id="mapDiv"></div>
+<div id="mapStatus">地图加载中...</div>
+</body>
+</html>

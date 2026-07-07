@@ -176,6 +176,13 @@
       },
       "url": "https://packages.tuanjie.cn"
     },
+    "net.gree.unity-webview": {
+      "version": "https://github.com/gree/unity-webview.git?path=/dist/package-nofragment",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "c70e59516be340acb15e5faa94a80add297a1a22"
+    },
     "com.unity.modules.ai": {
       "version": "1.0.0",
       "depth": 0,

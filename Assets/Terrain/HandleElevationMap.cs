@@ -85,6 +85,29 @@ public class HandleElevationMap : MonoBehaviour
     [Tooltip("使用 Legacy Diffuse 地形材质并关闭反射探针，彻底移除 PBR 镜面高光。")]
     public bool matteSurface = true;
 
+    [Header("Unlit Surface Grid")]
+    [Tooltip("在 Unlit 高程色图上显示横纵网格线。")]
+    public bool showSurfaceGrid = true;
+
+    [Tooltip("网格计算分辨率。picture2 使用 200；设为 0 时跟随 MQTT 数据宽高。")]
+    [Min(0)]
+    public int surfaceGridResolution = 200;
+
+    [Tooltip("每隔多少个高程单元画一条线。picture2 使用 8。")]
+    [Range(1, 32)]
+    public int gridEveryNthCell = 8;
+
+    [Tooltip("网格线颜色。")]
+    public Color surfaceGridColor = Color.white;
+
+    [Tooltip("网格线透明度。")]
+    [Range(0f, 1f)]
+    public float surfaceGridAlpha = 0.35f;
+
+    [Tooltip("网格线屏幕宽度倍率，1 通常约为一个像素。")]
+    [Range(0.25f, 3f)]
+    public float surfaceGridLineWidth = 1f;
+
     [Header("Real material (optional)")]
     [Tooltip("基础地表 Albedo（可平铺）。设置后将用真实贴图叠加高度分色 tint，而不是纯色底。")]
     public Texture2D baseAlbedo;
@@ -432,6 +455,7 @@ public class HandleElevationMap : MonoBehaviour
         _unlitHeightTexture.Apply(true, false);
 
         _unlitHeightMaterial.SetTexture("_HeightColorMap", _unlitHeightTexture);
+        ApplyUnlitGridSettings(dataW, dataH);
         return true;
     }
 
@@ -465,7 +489,25 @@ public class HandleElevationMap : MonoBehaviour
         terrain.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
         // This lightweight shader reads the Terrain mesh UV directly.
         terrain.drawInstanced = false;
+        ApplyUnlitGridSettings(0, 0);
         return true;
+    }
+
+    void ApplyUnlitGridSettings(int dataW, int dataH)
+    {
+        if (_unlitHeightMaterial == null) return;
+
+        int fallbackW = Mathf.Max(1, dataW);
+        int fallbackH = Mathf.Max(1, dataH);
+        int cellsX = surfaceGridResolution > 0 ? surfaceGridResolution : fallbackW;
+        int cellsY = surfaceGridResolution > 0 ? surfaceGridResolution : fallbackH;
+
+        _unlitHeightMaterial.SetFloat("_GridEnabled", showSurfaceGrid ? 1f : 0f);
+        _unlitHeightMaterial.SetVector("_GridCells", new Vector4(cellsX, cellsY, 0f, 0f));
+        _unlitHeightMaterial.SetFloat("_GridEvery", Mathf.Max(1, gridEveryNthCell));
+        _unlitHeightMaterial.SetColor("_GridColor", surfaceGridColor);
+        _unlitHeightMaterial.SetFloat("_GridAlpha", Mathf.Clamp01(surfaceGridAlpha));
+        _unlitHeightMaterial.SetFloat("_GridLineWidth", Mathf.Max(0.01f, surfaceGridLineWidth));
     }
 
     void OnDestroy()

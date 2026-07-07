@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>2D Excavator IMU View</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --stage-width: 616;
+        --stage-height: 403;
+        --blue: #7da2ff;
+        --blue-soft: #d7e2ff;
+        --yellow: #ffd100;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+      }
+
+      .viewport {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        /* overflow: hidden; */
+      }
+
+      .stage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 616px;
+        height: 403px;
+        transform: translate(var(--stage-left, 0), var(--stage-top, 0))
+          scale(var(--stage-scale, 1));
+        transform-origin: 0 0;
+      }
+
+      .part {
+        position: absolute;
+        display: block;
+        user-select: none;
+        -webkit-user-drag: none;
+        transition:
+          left 70ms linear,
+          top 70ms linear,
+          transform 70ms linear;
+        will-change: transform, left, top;
+      }
+
+      .base {
+        left: 0;
+        top: 258px;
+        width: 166px;
+        height: 84px;
+      }
+
+      .angle-label {
+        position: absolute;
+        z-index: 10;
+        min-width: 150px;
+        font-size: 40px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        text-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+        white-space: nowrap;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        transition:
+          left 70ms linear,
+          top 70ms linear;
+        will-change: transform, left, top;
+      }
+
+      .angle-label.boom,
+      .angle-label.stick {
+        color: var(--blue);
+      }
+
+      .angle-label.stick {
+        color: var(--blue-soft);
+      }
+
+      .angle-label.bucket {
+        color: var(--yellow);
+      }
+
+      .debug-panel {
+        position: fixed;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        z-index: 20;
+        display: none;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        background: rgba(20, 20, 20, 0.78);
+        backdrop-filter: blur(14px);
+      }
+
+      .debug-panel.visible {
+        display: grid;
+      }
+
+      .debug-row {
+        display: grid;
+        grid-template-columns: 68px 1fr 82px;
+        align-items: center;
+        gap: 10px;
+        color: #fff;
+        font-size: 13px;
+      }
+
+      .debug-row input {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="viewport" aria-label="2D excavator IMU animation">
+      <div class="stage" id="stage">
+        <img class="part base" src="./base.png" alt="excavator base" />
+        <img class="part boom" id="boom" src="./boom.png" alt="boom" />
+        <img class="part stick" id="stick" src="./stick.png" alt="stick" />
+        <img class="part bucket" id="bucket" src="./bucket.png" alt="bucket" />
+
+        <div class="angle-label boom" id="boomLabel">-70&deg;</div>
+        <div class="angle-label stick" id="stickLabel">180&deg;</div>
+        <div class="angle-label bucket" id="bucketLabel">60&deg;</div>
+      </div>
+    </main>
+
+    <section class="debug-panel" id="debugPanel" aria-label="angle debug controls">
+      <label class="debug-row">
+        <span>大臂</span>
+        <input id="boomInput" type="range" min="-90" max="0" step="0.01" />
+        <output id="boomOutput"></output>
+      </label>
+      <label class="debug-row">
+        <span>小臂</span>
+        <input id="stickInput" type="range" min="0" max="360" step="0.01" />
+        <output id="stickOutput"></output>
+      </label>
+      <label class="debug-row">
+        <span>铲斗</span>
+        <input id="bucketInput" type="range" min="0" max="180" step="0.01" />
+        <output id="bucketOutput"></output>
+      </label>
+    </section>
+
+    <script>
+      (() => {
+        const STAGE = { width: 616, height: 403 };
+
+        // These default values reproduce the supplied design frame.
+        const DEFAULT_ANGLES = {
+          boom: -70,
+          stick: 180,
+          bucket: 60,
+        };
+
+        const ANGLE_LIMITS = {
+          boom: { min: -90, max: 0 },
+          // The stick uses the +/-180 boundary as its center:
+          // inward: 180 -> 0, outward: -180 -> 0.
+          stick: { min: -180, max: 180, wrapsAt180: true },
+          bucket: { min: 0, max: 180 },
+        };
+
+        const PARTS = {
+          boom: {
+            el: document.getElementById("boom"),
+            label: document.getElementById("boomLabel"),
+            width: 334,
+            height: 134,
+            pivot: { x: 0, y: 133 },
+            end: { x: 334, y: 0 },
+            labelOffset: { x: -106, y: -160 },
+          },
+          stick: {
+            el: document.getElementById("stick"),
+            label: document.getElementById("stickLabel"),
+            width: 54,
+            height: 212,
+            pivot: { x: 0, y: 33 },
+            end: { x: 52, y: 212 },
+            labelOffset: { x: 92, y: -92 },
+          },
+          bucket: {
+            el: document.getElementById("bucket"),
+            label: document.getElementById("bucketLabel"),
+            width: 104,
+            height: 96,
+            pivot: { x: 84, y: 0 },
+            labelOffset: { x: -132, y: 52 },
+          },
+        };
+
+        const state = { ...DEFAULT_ANGLES };
+        const stageEl = document.getElementById("stage");
+        const viewportEl = document.querySelector(".viewport");
+
+        function fitStage() {
+          const rect = viewportEl.getBoundingClientRect();
+          const scale = Math.min(rect.width / STAGE.width, rect.height / STAGE.height);
+          const left = (rect.width - STAGE.width * scale) / 2;
+          const top = (rect.height - STAGE.height * scale) / 2;
+
+          stageEl.style.setProperty("--stage-scale", scale);
+          stageEl.style.setProperty("--stage-left", `${left}px`);
+          stageEl.style.setProperty("--stage-top", `${top}px`);
+        }
+
+        function rotatePoint(point, pivot, degrees) {
+          const radians = (degrees * Math.PI) / 180;
+          const cos = Math.cos(radians);
+          const sin = Math.sin(radians);
+          const dx = point.x - pivot.x;
+          const dy = point.y - pivot.y;
+
+          return {
+            x: pivot.x + dx * cos - dy * sin,
+            y: pivot.y + dx * sin + dy * cos,
+          };
+        }
+
+        function clamp(value, min, max) {
+          return Math.min(Math.max(value, min), max);
+        }
+
+        function normalizeStickAngle(value) {
+          if (value === 180 || value === -180) return value;
+
+          const normalized = ((((value + 180) % 360) + 360) % 360) - 180;
+          return normalized === -180 && value > 0 ? 180 : normalized;
+        }
+
+        function sanitizeAngle(key, value) {
+          const numericValue = Number(value);
+          if (!Number.isFinite(numericValue)) return state[key];
+
+          const limit = ANGLE_LIMITS[key];
+          if (limit.wrapsAt180) return normalizeStickAngle(numericValue);
+          return clamp(numericValue, limit.min, limit.max);
+        }
+
+        function shortestAngleDelta(value, origin) {
+          return ((((value - origin + 180) % 360) + 360) % 360) - 180;
+        }
+
+        function stickAngleToDebugProgress(angle) {
+          if (Math.abs(angle) === 180) return 180;
+          if (angle < 0) return Math.abs(angle);
+          return 360 - angle;
+        }
+
+        function stickDebugProgressToAngle(progress) {
+          if (progress === 180) return 180;
+          if (progress < 180) return -progress;
+          return 360 - progress;
+        }
+
+        function placePart(part, pivotGlobal, delta) {
+          const left = pivotGlobal.x - part.pivot.x;
+          const top = pivotGlobal.y - part.pivot.y;
+
+          part.el.style.left = `${left}px`;
+          part.el.style.top = `${top}px`;
+          part.el.style.width = `${part.width}px`;
+          part.el.style.height = `${part.height}px`;
+          part.el.style.transformOrigin = `${part.pivot.x}px ${part.pivot.y}px`;
+          part.el.style.transform = `rotate(${delta}deg)`;
+
+          if (!part.end) return null;
+          const rotatedEnd = rotatePoint(part.end, part.pivot, delta);
+          return {
+            x: left + rotatedEnd.x,
+            y: top + rotatedEnd.y,
+          };
+        }
+
+        function placeLabel(label, anchor, offset, value) {
+          label.style.left = `${anchor.x + offset.x}px`;
+          label.style.top = `${anchor.y + offset.y}px`;
+          label.textContent = `${Number(value).toFixed(2)}°`;
+        }
+
+        function draw() {
+          const boomDelta = -shortestAngleDelta(state.boom, DEFAULT_ANGLES.boom);
+          const stickDelta = shortestAngleDelta(state.stick, DEFAULT_ANGLES.stick);
+          const bucketDelta = -shortestAngleDelta(
+            state.bucket,
+            DEFAULT_ANGLES.bucket
+          );
+
+          const boomPivot = { x: 116, y: 258 };
+          const stickPivot = placePart(PARTS.boom, boomPivot, boomDelta);
+          const bucketPivot = placePart(PARTS.stick, stickPivot, stickDelta);
+          placePart(PARTS.bucket, bucketPivot, bucketDelta);
+
+          placeLabel(
+            PARTS.boom.label,
+            boomPivot,
+            PARTS.boom.labelOffset,
+            state.boom
+          );
+          placeLabel(
+            PARTS.stick.label,
+            stickPivot,
+            PARTS.stick.labelOffset,
+            state.stick
+          );
+          placeLabel(
+            PARTS.bucket.label,
+            bucketPivot,
+            PARTS.bucket.labelOffset,
+            state.bucket
+          );
+        }
+
+        function readAngle(data, keys, fallback) {
+          for (const key of keys) {
+            const value = Number(data && data[key]);
+            if (Number.isFinite(value)) return sanitizeAngle(fallback.key, value);
+          }
+          return fallback.value;
+        }
+
+        function normalizePayload(payload) {
+          if (typeof payload === "string") {
+            try {
+              payload = JSON.parse(payload);
+            } catch (error) {
+              console.warn("Invalid IMU payload JSON:", error);
+              return {};
+            }
+          }
+
+          if (payload && payload.joints) {
+            const joints = payload.joints;
+
+            return {
+              boom: joints.boom && joints.boom.z,
+              stick: joints.stick && joints.stick.z,
+              bucket: joints.bucket && joints.bucket.z,
+            };
+          }
+
+          if (payload && payload.angles) return payload.angles;
+          return payload || {};
+        }
+
+        function updateExcavatorAngles(payload) {
+          const data = normalizePayload(payload);
+
+          state.boom = readAngle(
+            data,
+            ["boom", "boomAngle", "bigArm", "bigArmAngle"],
+            { key: "boom", value: state.boom }
+          );
+          state.stick = readAngle(
+            data,
+            ["stick", "stickAngle", "smallArm", "smallArmAngle"],
+            { key: "stick", value: state.stick }
+          );
+          state.bucket = readAngle(
+            data,
+            ["bucket", "bucketAngle"],
+            { key: "bucket", value: state.bucket }
+          );
+
+          draw();
+          syncDebugPanel();
+        }
+
+        function applyExcavatorPayload(payload) {
+          updateExcavatorAngles(payload);
+        }
+
+        function syncDebugPanel() {
+          for (const key of ["boom", "stick", "bucket"]) {
+            const input = document.getElementById(`${key}Input`);
+            const output = document.getElementById(`${key}Output`);
+            if (!input || !output) continue;
+
+            input.value =
+              key === "stick" ? stickAngleToDebugProgress(state[key]) : state[key];
+            output.textContent = `${state[key].toFixed(2)}°`;
+          }
+        }
+
+        function initDebugPanel() {
+          if (!new URLSearchParams(window.location.search).has("debug")) return;
+
+          const debugPanel = document.getElementById("debugPanel");
+          debugPanel.classList.add("visible");
+
+          for (const key of ["boom", "stick", "bucket"]) {
+            const input = document.getElementById(`${key}Input`);
+            const output = document.getElementById(`${key}Output`);
+            input.addEventListener("input", () => {
+              const progressValue = Number(input.value);
+              const nextValue =
+                key === "stick"
+                  ? stickDebugProgressToAngle(progressValue)
+                  : progressValue;
+              output.textContent = `${nextValue.toFixed(2)}°`;
+              updateExcavatorAngles({ [key]: nextValue });
+            });
+          }
+
+          syncDebugPanel();
+        }
+
+        window.updateExcavatorAngles = updateExcavatorAngles;
+        window.setExcavatorAngles = updateExcavatorAngles;
+        window.onImuData = updateExcavatorAngles;
+        window.applyExcavatorPayload = applyExcavatorPayload;
+        window.ExcavatorView = {
+          updateAngles: updateExcavatorAngles,
+          setAngles: updateExcavatorAngles,
+          applyPayload: applyExcavatorPayload,
+        };
+
+        fitStage();
+        draw();
+        initDebugPanel();
+
+        window.addEventListener("resize", fitStage);
+        if ("ResizeObserver" in window) {
+          new ResizeObserver(fitStage).observe(viewportEl);
+        }
+      })();
+    </script>
+  </body>
+</html>

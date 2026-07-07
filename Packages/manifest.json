@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "com.github-glitchenzo.nugetforunity": "https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity",
+    "net.gree.unity-webview": "https://github.com/gree/unity-webview.git?path=/dist/package-nofragment",
     "com.unity.webrtc": "3.0.0-pre.8",
     "com.unity.collab-proxy": "2.11.3",
     "com.unity.feature.mobile": "1.0.0",

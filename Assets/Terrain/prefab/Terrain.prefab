@@ -159,6 +159,12 @@ MonoBehaviour:
   noiseOctaves: 2
   surfaceBrightness: 1
   matteSurface: 1
+  showSurfaceGrid: 1
+  surfaceGridResolution: 200
+  gridEveryNthCell: 8
+  surfaceGridColor: {r: 1, g: 1, b: 1, a: 1}
+  surfaceGridAlpha: 0.35
+  surfaceGridLineWidth: 1
   baseAlbedo: {fileID: 0}
   baseNormal: {fileID: 0}
   heightTintStrength: 1

@@ -1882,6 +1882,7 @@ MonoBehaviour:
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
   colorBands: 6
+  useUnlitHeightMaterial: 1
   enableColoring: 0
   rebuildTerrainLayersEveryUpdate: 0
   useGlobalRangeForColoring: 1
@@ -1899,6 +1900,13 @@ MonoBehaviour:
   noiseFrequency: 22
   noiseOctaves: 2
   surfaceBrightness: 1.15
+  matteSurface: 1
+  showSurfaceGrid: 1
+  surfaceGridResolution: 200
+  gridEveryNthCell: 8
+  surfaceGridColor: {r: 1, g: 1, b: 1, a: 1}
+  surfaceGridAlpha: 0.35
+  surfaceGridLineWidth: 1
   baseAlbedo: {fileID: 0}
   baseNormal: {fileID: 0}
   heightTintStrength: 0.45
@@ -1935,12 +1943,12 @@ Light:
   serializedVersion: 10
   m_Type: 1
   m_Shape: 0
-  m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
+  m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 0.36078432}
   m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.802082
-  m_CookieSize: 10
+  m_CookieSize: 5
   m_Shadows:
     m_Type: 2
     m_Resolution: -1
@@ -1996,7 +2004,7 @@ Transform:
   m_GameObject: {fileID: 705507993}
   serializedVersion: 2
   m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
-  m_LocalPosition: {x: -0.54, y: 10.61, z: -2.44}
+  m_LocalPosition: {x: 22.2, y: 24.47, z: 20.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3763,55 +3771,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bb8889102d26a426fb2d69f07619f30f, type: 3}
---- !u!1 &1330390344
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 7
-  m_Component:
-  - component: {fileID: 1330390346}
-  - component: {fileID: 1330390345}
-  m_Layer: 0
-  m_HasEditorInfo: 1
-  m_Name: TcpCanPayloadReceiver
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1330390345
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1330390344}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 43b71e58cb1c446ae99b890e8baceb6d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  host: 127.0.0.1
-  port: 9000
-  autoReconnect: 1
-  reconnectDelaySeconds: 1
---- !u!4 &1330390346
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1330390344}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.25257802, y: 5.436653, z: 3.825715}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1332305751
 GameObject:
   m_ObjectHideFlags: 0
@@ -4992,7 +4951,7 @@ Transform:
   m_GameObject: {fileID: 1768707586}
   serializedVersion: 2
   m_LocalRotation: {x: -0.004871495, y: 0.0047880253, z: -0.004020702, w: 0.99996865}
-  m_LocalPosition: {x: -5.24, y: -1.6823897, z: 3.24}
+  m_LocalPosition: {x: -5.24, y: -1.68, z: 3.23}
   m_LocalScale: {x: 49.08762, y: 0.007661857, z: 47.07148}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5565,6 +5524,7 @@ GameObject:
   - component: {fileID: 1967017552}
   - component: {fileID: 1967017553}
   - component: {fileID: 1967017554}
+  - component: {fileID: 1967017555}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: UIDocument
@@ -5683,6 +5643,28 @@ MonoBehaviour:
   windowMeters: 60
   trailMax: 600
   backgroundTexture: {fileID: 0}
+--- !u!114 &1967017555
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1967017547}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61497b2a39e744dea64a5426ea6728fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  panels:
+  - elementName: map-webview
+    htmlPath: excavator-map/index.html
+    visible: 1
+    skipInEditor: 0
+  - elementName: arm-webview
+    htmlPath: 2d-excavator/index.html
+    visible: 1
+    skipInEditor: 0
+  layoutRefreshInterval: 0.15
 --- !u!1 &1973221549 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8164078558771037576, guid: 1fdd0ed6a239246288e82977e7bc386e,
@@ -5909,4 +5891,3 @@ SceneRoots:
   - {fileID: 145017723}
   - {fileID: 532966906}
   - {fileID: 1815460397}
-  - {fileID: 1330390346}
