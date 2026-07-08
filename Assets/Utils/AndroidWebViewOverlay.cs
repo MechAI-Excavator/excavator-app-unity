@@ -32,6 +32,7 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
     private Type _webViewObjectType;
     private float _nextLayoutRefresh;
     private bool _warnedMissingPlugin;
+    private bool _globalVisible = true;
 
     private sealed class RuntimeWebView
     {
@@ -121,7 +122,7 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
 
                 InitWebView(webView);
                 SetMargins(webView, rect);
-                SetVisibility(webView, panel.visible);
+                SetVisibility(webView, panel.visible && _globalVisible);
                 string url = BuildLocalUrl(panel.htmlPath);
                 LoadUrl(webView, url);
                 Debug.Log($"[WebViewOverlay] Created '{panel.elementName}' rect={rect} url={url}");
@@ -164,7 +165,17 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
                 SetMargins(view.webView, rect);
             }
 
-            SetVisibility(view.webView, view.panel.visible);
+            SetVisibility(view.webView, view.panel.visible && _globalVisible);
+        }
+    }
+
+    public void SetGlobalVisibility(bool visible)
+    {
+        _globalVisible = visible;
+        foreach (var view in _runtimeViews)
+        {
+            if (view.webView != null)
+                SetVisibility(view.webView, view.panel.visible && _globalVisible);
         }
     }
 

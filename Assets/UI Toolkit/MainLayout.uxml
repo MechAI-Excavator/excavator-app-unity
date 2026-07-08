@@ -9,7 +9,8 @@
                 <ui:Label text="3D点云" class="view-tab" />
                 <ui:Label text="高程图" class="view-tab view-tab--active" />
             </ui:VisualElement>
-            <ui:Label name="settings-button" text="⚙" class="settings-button" />
+
+            <ui:VisualElement name="settings-button" class="settings-button" />
 
             <ui:VisualElement name="map-card" class="glass-card map-card">
                 <ui:Label text="位置地图" class="panel-heading" />
@@ -61,6 +62,36 @@
                 <ui:Label text="⌁" class="tool-icon" />
                 <ui:Label text="△" class="tool-icon" />
                 <ui:Label text="▱" class="tool-icon" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="settings-scrim" class="settings-scrim settings-hidden" />
+            <ui:VisualElement name="settings-drawer" class="settings-drawer settings-hidden">
+                <ui:VisualElement class="settings-menu">
+                    <ui:VisualElement name="settings-menu-display" class="settings-menu-item settings-menu-item--selected">
+                        <ui:Label text="显示与视图" class="settings-menu-label" />
+                        <ui:Label text="›" class="settings-menu-arrow" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="settings-menu-control" class="settings-menu-item">
+                        <ui:Label text="控制与输入" class="settings-menu-label" />
+                        <ui:Label text="›" class="settings-menu-arrow" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="settings-menu-device" class="settings-menu-item">
+                        <ui:Label text="设备与连接" class="settings-menu-label" />
+                        <ui:Label text="›" class="settings-menu-arrow" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="settings-menu-safety" class="settings-menu-item">
+                        <ui:Label text="安全与告警" class="settings-menu-label" />
+                        <ui:Label text="›" class="settings-menu-arrow" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="settings-menu-data" class="settings-menu-item">
+                        <ui:Label text="数据与图层" class="settings-menu-label" />
+                        <ui:Label text="›" class="settings-menu-arrow" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="settings-menu-general" class="settings-menu-item">
+                        <ui:Label text="通用设置" class="settings-menu-label" />
+                        <ui:Label text="›" class="settings-menu-arrow" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

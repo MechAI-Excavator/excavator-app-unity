@@ -31,7 +31,7 @@ public class MqttManager : MonoBehaviour
     public string[] subscribeTopics = { "excavator/sensor", "01/map/elevation", "01/sensor/rtk_lio", "01/joint_control" };
 
     [Tooltip("发布数据的默认主题")]
-    public string publishTopic = "excavator/control";
+    public string publishTopic = "excavator_001/control";
 
     // 连接状态
     public bool IsConnected => client != null && client.IsConnected;
@@ -130,7 +130,9 @@ public class MqttManager : MonoBehaviour
             return;
         }
         byte[] payload = Encoding.UTF8.GetBytes(message);
-        client.Publish(topic, payload, MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, retain);
+        Debug.Log($"Publishing to {topic}: {message}");
+        int msgId =client.Publish(topic, payload, MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, retain);
+        Debug.Log($"Published topic={topic} msgId={msgId} qos=1 retain={retain}");
     }
 
     /// <summary>发布到默认主题</summary>
@@ -263,10 +265,10 @@ public class MqttManager : MonoBehaviour
             if (_excavatorController != null)
             {
                 _excavatorController.ApplyJointControl(
-                    data.joints.cabin.angle,
-                    data.joints.boom.angle,
-                    data.joints.stick.angle,
-                    data.joints.bucket.angle
+                    data.joints.cabin.pwm,
+                    data.joints.boom.pwm,
+                    data.joints.stick.pwm,
+                    data.joints.bucket.pwm
                 );
             }
             else
@@ -313,8 +315,7 @@ public class MqttManager : MonoBehaviour
 [Serializable]
 public class JointState
 {
-    public float angle;
-    public float velocity;
+    public float pwm;
 }
 
 [Serializable]
@@ -324,6 +325,8 @@ public class JointsPayload
     public JointState boom;
     public JointState stick;
     public JointState bucket;
+    public JointState leftTrack;
+    public JointState rightTrack;
 }
 
 [Serializable]

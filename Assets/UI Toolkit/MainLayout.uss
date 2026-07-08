@@ -71,12 +71,12 @@ TemplateContainer {
 }
 
 .top-title-wing-left {
-    background: linear-gradient(to right, rgba(240, 165, 0, 0), rgba(240, 165, 0, 0.5));
+    background-color: rgba(240, 165, 0, 0.32);
     margin-right: -1px;
 }
 
 .top-title-wing-right {
-    background: linear-gradient(to left, rgba(240, 165, 0, 0), rgba(240, 165, 0, 0.5));
+    background-color: rgba(240, 165, 0, 0.32);
     margin-left: -1px;
 }
 
@@ -810,9 +810,13 @@ TemplateContainer {
     right: 48px;
     width: 42px;
     height: 42px;
-    color: rgba(255, 255, 255, 0.92);
-    font-size: 38px;
-    -unity-text-align: middle-center;
+    background-image: resource("settingIcon");
+    -unity-background-scale-mode: scale-to-fit;
+    opacity: 0.92;
+}
+
+.settings-button:hover {
+    opacity: 1;
 }
 
 .glass-card {
@@ -1025,4 +1029,101 @@ TemplateContainer {
 
 .tool-icon--active {
     color: #ffffff;
+}
+
+.settings-scrim {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0);
+    opacity: 1;
+    visibility: visible;
+    transition-property: opacity;
+    transition-duration: 0.16s;
+    transition-timing-function: ease-out;
+}
+
+.settings-drawer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    min-width: 0;
+    padding-top: 54px;
+    padding-right: 24px;
+    padding-bottom: 32px;
+    padding-left: 0;
+    align-items: flex-end;
+    background-color: rgba(126, 170, 255, 0.32);
+    background-image: resource("settingsDrawerGradient");
+    -unity-background-scale-mode: stretch-to-fill;
+    border-left-width: 0;
+    opacity: 1;
+    translate: 0 0;
+    visibility: visible;
+    overflow: hidden;
+    transition-property: opacity, translate;
+    transition-duration: 0.22s;
+    transition-timing-function: ease-out;
+}
+
+.settings-hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.settings-drawer.settings-hidden {
+    translate: 100% 0;
+}
+
+.settings-menu {
+    position: relative;
+    width: 300px;
+    align-self: flex-end;
+    flex-grow: 1;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.settings-menu-item {
+    width: 260px;
+    height: 62px;
+    padding-left: 22px;
+    padding-right: 18px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    border-radius: 3px;
+    opacity: 0.62;
+}
+
+.settings-menu-item:hover,
+.settings-menu-item--selected {
+    background-color: rgba(13, 72, 186, 0.62);
+    opacity: 1;
+}
+
+.settings-menu-label {
+    flex-grow: 1;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 24px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-right;
+}
+
+.settings-menu-item:hover .settings-menu-label,
+.settings-menu-item--selected .settings-menu-label {
+    color: #ffffff;
+}
+
+.settings-menu-arrow {
+    width: 26px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 28px;
+    -unity-text-align: middle-right;
+    margin-left: 12px;
 }

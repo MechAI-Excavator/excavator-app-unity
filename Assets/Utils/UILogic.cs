@@ -1,274 +1,489 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
+/// <summary>
+/// 车辆运动状态。后续接入 CAN/MQTT 时，只需要调用 SetVehicleMotionState。
+/// </summary>
+public enum VehicleMotionState
+{
+    Idle = 0,
+    LeftTurn = 1,
+    RightTurn = 2,
+    RearTurn = 3,
+    Forward = 4,
+    RearLeftTurn = 5,
+    RearRightTurn = 6
+}
+
+/// <summary>
+/// 顶部遥测栏中可独立更新的字段。
+/// </summary>
+public enum TelemetryField
+{
+    SensorRtk,
+    SensorImu,
+    SensorLidar,
+    SensorCamera,
+    SensorRadar,
+    BaseSignal,
+    BasePing,
+    BaseThroughput,
+    BasePacketLoss,
+    BaseRssi,
+    NetworkRssi,
+    NetworkOperator,
+    NetworkSim,
+    ComputeCpu,
+    ComputeGpu,
+    ComputeMemory,
+    ComputeBoardTemperature,
+    ComputeFan,
+    ComputePower,
+    ComputeVoltage,
+    ComputeCurrent,
+    PowerCabinetTemperature,
+    PowerExternalFan,
+    PowerBattery,
+    PowerDevicePower
+}
+
+/// <summary>
+/// 遥测值的显示级别，用于控制文字颜色。
+/// </summary>
+public enum TelemetryLevel
+{
+    Neutral,
+    Good,
+    Warning,
+    Error
+}
+
+/// <summary>
+/// 一条遥测 UI 更新。Text 应包含显示单位，例如 "42ms" 或 "67°C"。
+/// </summary>
+public readonly struct TelemetryUpdate
+{
+    public TelemetryField Field { get; }
+    public string Text { get; }
+    public TelemetryLevel Level { get; }
+
+    public TelemetryUpdate(
+        TelemetryField field,
+        string text,
+        TelemetryLevel level = TelemetryLevel.Neutral)
+    {
+        Field = field;
+        Text = text;
+        Level = level;
+    }
+}
+
+/// <summary>
+/// UIDocument 的车辆状态与遥测数据事件入口。
+/// 当前提供 ContextMenu 和可选键盘 mock，实际业务事件可复用公开方法。
+/// </summary>
+[RequireComponent(typeof(UIDocument))]
 public class UILogic : MonoBehaviour
 {
-    // ── UI 元素缓存 ──────────────────────────────────────────
-    private VisualElement _dotConn;
-    private Label _lblConnStatus;
+    [Header("开发调试")]
+    [SerializeField] bool enableKeyboardMock;
 
-    private ProgressBar _pbBattery;
-    private Label _lblBatteryPct;
-    private Label _lblBatteryElec;
+    public VehicleMotionState CurrentState { get; private set; } = VehicleMotionState.Idle;
 
-    private Label _lblMode;
+    public event Action<VehicleMotionState> VehicleMotionStateChanged;
 
-    private Label _lblTemp;
+    /// <summary>
+    /// 遥测值完成 UI 刷新后在 Unity 主线程触发。
+    /// </summary>
+    public event Action<TelemetryUpdate> TelemetryValueChanged;
 
-    private Label _lblMissionTask;
-    private ProgressBar _pbMission;
-    private Label _lblMissionPct;
-    private Label _lblMissionCmd;
+    readonly ConcurrentQueue<TelemetryUpdate> _pendingTelemetryUpdates =
+        new ConcurrentQueue<TelemetryUpdate>();
 
-    private ScrollView _faultList;
-    private Label _lblFaultCount;
-    private Label _lblUptime;
-    private Label _lblDatetime;
+    readonly Dictionary<TelemetryField, Label> _telemetryLabels =
+        new Dictionary<TelemetryField, Label>();
 
-    private MqttManager _mqtt;
+    Button _leftButton;
+    Button _forwardButton;
+    Button _idleButton;
+    Button _rightButton;
+    Button _rearButton;
+    Label _stateLabel;
+    VisualElement _settingsButton;
+    VisualElement _settingsScrim;
+    VisualElement _settingsDrawer;
+    AndroidWebViewOverlay _webViewOverlay;
+    readonly List<VisualElement> _settingsMenuItems = new List<VisualElement>();
 
-    // ── 模式显示映射 ─────────────────────────────────────────
-    private static readonly string[] ModeClasses =
-        { "mode-autonomous", "mode-manual", "mode-remote", "mode-idle", "mode-error" };
-
-    void Start()
+    void OnEnable()
     {
-        var root = GetComponent<UIDocument>().rootVisualElement;
-        var centerView = root.Q<VisualElement>("center-view");
-        if (centerView != null) centerView.pickingMode = PickingMode.Ignore;
+        BindTestControls();
+        BindTelemetryLabels();
+        BindSettingsDrawer();
+        UpdateStateLabel();
+    }
 
-        BindElements(root);
-
-        _mqtt = FindFirstObjectByType<MqttManager>();
-        if (_mqtt != null)
-        {
-            _mqtt.OnConnected += () => SetConnected(true);
-            _mqtt.OnDisconnected += () => SetConnected(false);
-            _mqtt.OnStatusUpdated += OnStatusUpdated;
-        }
+    void OnDisable()
+    {
+        UnbindSettingsDrawer();
+        UnbindTestControls();
+        _telemetryLabels.Clear();
     }
 
     void Update()
     {
-        if (_lblDatetime != null)
-            _lblDatetime.text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-    }
+        FlushTelemetryUpdates();
 
-    // ── 绑定元素 ─────────────────────────────────────────────
-
-    private void BindElements(VisualElement root)
-    {
-        _dotConn = root.Q<VisualElement>("dot-conn");
-        _lblConnStatus = root.Q<Label>("lbl-conn-status");
-
-        _pbBattery = root.Q<ProgressBar>("pb-battery");
-        _lblBatteryPct = root.Q<Label>("lbl-battery-pct");
-        _lblBatteryElec = root.Q<Label>("lbl-battery-elec");
-
-        _lblMode = root.Q<Label>("lbl-mode");
-
-        _lblTemp = root.Q<Label>("lbl-temp");
-
-        _lblMissionTask = root.Q<Label>("lbl-mission-task");
-        _pbMission = root.Q<ProgressBar>("pb-mission");
-        _lblMissionPct = root.Q<Label>("lbl-mission-pct");
-        _lblMissionCmd = root.Q<Label>("lbl-mission-cmd");
-
-        _faultList = root.Q<ScrollView>("fault-list");
-        _lblFaultCount = root.Q<Label>("lbl-fault-count");
-        _lblUptime = root.Q<Label>("lbl-uptime");
-        _lblDatetime = root.Q<Label>("lbl-datetime");
-    }
-
-    // ── 连接状态 ─────────────────────────────────────────────
-
-    private void SetConnected(bool connected)
-    {
-        if (_dotConn != null)
-        {
-            _dotConn.RemoveFromClassList("status-dot-green");
-            _dotConn.RemoveFromClassList("status-dot-red");
-            _dotConn.AddToClassList(connected ? "status-dot-green" : "status-dot-red");
-        }
-        if (_lblConnStatus != null)
-            _lblConnStatus.text = connected ? "通信正常" : "通信断开";
-    }
-
-    // ── 系统状态更新 ─────────────────────────────────────────
-
-    private void OnStatusUpdated(SystemStatusMsg data)
-    {
-        UpdatePower(data.system_status?.power);
-        UpdateMode(data.system_status?.mode);
-        UpdateTemperature(data.system_status?.temperature);
-        UpdateUptime(data.system_status?.uptime ?? -1);
-        UpdateMission(data.mission_status);
-        UpdateFaults(data.faults);
-    }
-
-    private void UpdatePower(PowerStatus power)
-    {
-        if (power == null)
-        {
-            SetSafe(_lblBatteryPct, "--%");
-            SetSafe(_lblBatteryElec, "--V  --A");
-            if (_pbBattery != null) _pbBattery.value = 0f;
+        if (!enableKeyboardMock)
             return;
-        }
-        float pct = Mathf.Clamp(power.battery_level, 0f, 100f);
-        if (_pbBattery != null) _pbBattery.value = pct;
-        SetSafe(_lblBatteryPct, $"{pct:0}%");
-        SetSafe(_lblBatteryElec, $"{power.voltage:0.0}V  {power.current:0.0}A");
 
-        // 电量低时变红
-        if (_pbBattery != null)
-        {
-            var fill = _pbBattery.Q<VisualElement>(className: "unity-progress-bar__progress");
-            if (fill != null)
-                fill.style.backgroundColor = pct < 20f
-                    ? new StyleColor(new Color(0.9f, 0.27f, 0.23f))
-                    : new StyleColor(new Color(0.208f, 0.78f, 0.349f));
-        }
+        if (Input.GetKeyDown(KeyCode.Alpha0))
+            MockIdle();
+        else if (Input.GetKeyDown(KeyCode.Alpha1))
+            MockLeftTurn();
+        else if (Input.GetKeyDown(KeyCode.Alpha2))
+            MockRightTurn();
+        else if (Input.GetKeyDown(KeyCode.Alpha3))
+            MockRearTurn();
+        else if (Input.GetKeyDown(KeyCode.Alpha4))
+            MockForward();
     }
 
-    private void UpdateMode(string mode)
+    /// <summary>
+    /// 正式事件接入点。重复状态不会产生多余 UI 刷新。
+    /// </summary>
+    public void SetVehicleMotionState(VehicleMotionState state)
     {
-        if (_lblMode == null) return;
-
-        foreach (var cls in ModeClasses)
-            _lblMode.RemoveFromClassList(cls);
-
-        if (string.IsNullOrEmpty(mode))
+        if (CurrentState == state)
         {
-            _lblMode.text = "--";
-            _lblMode.AddToClassList("mode-idle");
+            UpdateStateLabel();
             return;
         }
 
-        string badgeClass;
-        string displayText;
-        switch (mode.ToLower())
-        {
-            case "autonomous": badgeClass = "mode-autonomous"; displayText = "自主"; break;
-            case "manual": badgeClass = "mode-manual"; displayText = "手动"; break;
-            case "remote": badgeClass = "mode-remote"; displayText = "遥控"; break;
-            case "idle": badgeClass = "mode-idle"; displayText = "待机"; break;
-            case "error": badgeClass = "mode-error"; displayText = "故障"; break;
-            default: badgeClass = "mode-idle"; displayText = mode; break;
-        }
-        _lblMode.text = displayText;
-        _lblMode.AddToClassList(badgeClass);
+        CurrentState = state;
+        UpdateStateLabel();
+        VehicleMotionStateChanged?.Invoke(state);
     }
 
-    private void UpdateTemperature(TemperatureStatus temp)
+    /// <summary>
+    /// 正式遥测数据入口，可从 MQTT/WebSocket 等后台回调线程调用。
+    /// 数据会排队，并在下一帧由 Unity 主线程更新 UI。
+    /// </summary>
+    public void PublishTelemetry(
+        TelemetryField field,
+        string text,
+        TelemetryLevel level = TelemetryLevel.Neutral)
     {
-        if (_lblTemp == null) return;
-        if (temp == null)
-        {
-            _lblTemp.text = "马达:--  控制:--  液压:--";
+        _pendingTelemetryUpdates.Enqueue(new TelemetryUpdate(field, text, level));
+    }
+
+    /// <summary>
+    /// 批量发布同一批次收到的遥测数据。
+    /// </summary>
+    public void PublishTelemetry(params TelemetryUpdate[] updates)
+    {
+        if (updates == null)
             return;
-        }
-        _lblTemp.text = $"马达:{temp.motor:0}°  控制:{temp.controller:0}°  液压:{temp.hydraulic:0}°";
+
+        foreach (var update in updates)
+            _pendingTelemetryUpdates.Enqueue(update);
     }
 
-    private void UpdateUptime(int seconds)
+    [ContextMenu("Mock/静止")]
+    public void MockIdle()
     {
-        if (_lblUptime == null) return;
-        if (seconds < 0) { _lblUptime.text = "--:--:--"; return; }
-        int h = seconds / 3600;
-        int m = (seconds % 3600) / 60;
-        int s = seconds % 60;
-        _lblUptime.text = $"{h:00}:{m:00}:{s:00}";
+        SetVehicleMotionState(VehicleMotionState.Idle);
     }
 
-    private void UpdateMission(MissionStatus mission)
+    [ContextMenu("Mock/左转")]
+    public void MockLeftTurn()
     {
-        if (mission == null)
-        {
-            SetSafe(_lblMissionTask, "无任务");
-            SetSafe(_lblMissionPct, "--%");
-            SetSafe(_lblMissionCmd, "--");
-            if (_pbMission != null) _pbMission.value = 0f;
+        SetVehicleMotionState(VehicleMotionState.LeftTurn);
+    }
+
+    [ContextMenu("Mock/前进")]
+    public void MockForward()
+    {
+        SetVehicleMotionState(VehicleMotionState.Forward);
+    }
+
+    [ContextMenu("Mock/右转")]
+    public void MockRightTurn()
+    {
+        SetVehicleMotionState(VehicleMotionState.RightTurn);
+    }
+
+    [ContextMenu("Mock/后退")]
+    public void MockRearTurn()
+    {
+        SetVehicleMotionState(VehicleMotionState.RearTurn);
+    }
+
+    void BindTestControls()
+    {
+        var document = GetComponent<UIDocument>();
+        if (document == null)
             return;
-        }
-        float pct = Mathf.Clamp(mission.progress, 0f, 100f);
-        SetSafe(_lblMissionTask, string.IsNullOrEmpty(mission.current_task) ? "无任务" : mission.current_task);
-        if (_pbMission != null) _pbMission.value = pct;
-        SetSafe(_lblMissionPct, $"{pct:0}%");
-        SetSafe(_lblMissionCmd, string.IsNullOrEmpty(mission.command_id) ? "--" : mission.command_id);
+
+        var root = document.rootVisualElement;
+        _leftButton = root.Q<Button>("btn-mock-left");
+        _forwardButton = root.Q<Button>("btn-mock-forward");
+        _idleButton = root.Q<Button>("btn-mock-idle");
+        _rightButton = root.Q<Button>("btn-mock-right");
+        _rearButton = root.Q<Button>("btn-mock-rear");
+        _stateLabel = root.Q<Label>("motion-state-label");
+
+        if (_leftButton != null)
+            _leftButton.clicked += MockLeftTurn;
+        if (_forwardButton != null)
+            _forwardButton.clicked += MockForward;
+        if (_idleButton != null)
+            _idleButton.clicked += MockIdle;
+        if (_rightButton != null)
+            _rightButton.clicked += MockRightTurn;
+        if (_rearButton != null)
+            _rearButton.clicked += MockRearTurn;
     }
 
-    private void UpdateFaults(FaultItem[] faults)
+    void UnbindTestControls()
     {
-        if (_faultList == null) return;
+        if (_leftButton != null)
+            _leftButton.clicked -= MockLeftTurn;
+        if (_forwardButton != null)
+            _forwardButton.clicked -= MockForward;
+        if (_idleButton != null)
+            _idleButton.clicked -= MockIdle;
+        if (_rightButton != null)
+            _rightButton.clicked -= MockRightTurn;
+        if (_rearButton != null)
+            _rearButton.clicked -= MockRearTurn;
 
-        _faultList.Clear();
+        _leftButton = null;
+        _forwardButton = null;
+        _idleButton = null;
+        _rightButton = null;
+        _rearButton = null;
+        _stateLabel = null;
+    }
 
-        if (faults == null || faults.Length == 0)
-        {
-            var empty = new Label("系统正常，无故障记录");
-            empty.AddToClassList("fault-empty");
-            _faultList.Add(empty);
-            SetFaultCountBadge(0, "ok");
+    void BindSettingsDrawer()
+    {
+        var document = GetComponent<UIDocument>();
+        if (document == null)
             return;
-        }
 
-        // 找到最高级别，用于决定计数徽标颜色
-        int maxLevel = 0;
-        foreach (var f in faults)
-            maxLevel = Mathf.Max(maxLevel, SeverityLevel(f.severity));
+        var root = document.rootVisualElement;
+        _settingsButton = root.Q<VisualElement>("settings-button");
+        _settingsScrim = root.Q<VisualElement>("settings-scrim");
+        _settingsDrawer = root.Q<VisualElement>("settings-drawer");
+        _webViewOverlay = GetComponent<AndroidWebViewOverlay>();
 
-        string badgeSeverity = maxLevel switch { 3 => "critical", 2 => "error", 1 => "warning", _ => "ok" };
-        SetFaultCountBadge(faults.Length, badgeSeverity);
+        if (_settingsButton != null)
+            _settingsButton.RegisterCallback<ClickEvent>(OnSettingsButtonClicked);
+        if (_settingsScrim != null)
+            _settingsScrim.RegisterCallback<ClickEvent>(OnSettingsScrimClicked);
+        if (_settingsDrawer != null)
+            _settingsDrawer.RegisterCallback<ClickEvent>(OnSettingsDrawerBackgroundClicked);
 
-        foreach (var fault in faults)
+        _settingsMenuItems.Clear();
+        string[] itemNames =
         {
-            string sev = (fault.severity ?? "info").ToLower();
+            "settings-menu-display",
+            "settings-menu-control",
+            "settings-menu-device",
+            "settings-menu-safety",
+            "settings-menu-data",
+            "settings-menu-general"
+        };
 
-            var item = new VisualElement();
-            item.AddToClassList("fault-item");
+        foreach (string itemName in itemNames)
+        {
+            var item = root.Q<VisualElement>(itemName);
+            if (item == null)
+                continue;
 
-            var dot = new VisualElement();
-            dot.AddToClassList("fault-item-dot");
-            dot.AddToClassList($"fault-dot-{sev}");
-            item.Add(dot);
-
-            var code = new Label(fault.code ?? "---");
-            code.AddToClassList("fault-item-code");
-            item.Add(code);
-
-            var msg = new Label(fault.message ?? "（无描述）");
-            msg.AddToClassList("fault-item-msg");
-            item.Add(msg);
-
-            _faultList.Add(item);
+            item.RegisterCallback<ClickEvent>(OnSettingsMenuItemClicked);
+            _settingsMenuItems.Add(item);
         }
     }
 
-    private void SetFaultCountBadge(int count, string severity)
+    void UnbindSettingsDrawer()
     {
-        if (_lblFaultCount == null) return;
-        _lblFaultCount.text = count.ToString();
-        _lblFaultCount.RemoveFromClassList("fault-count-ok");
-        _lblFaultCount.RemoveFromClassList("fault-count-warning");
-        _lblFaultCount.RemoveFromClassList("fault-count-error");
-        _lblFaultCount.RemoveFromClassList("fault-count-critical");
-        _lblFaultCount.AddToClassList($"fault-count-{severity}");
+        if (_settingsButton != null)
+            _settingsButton.UnregisterCallback<ClickEvent>(OnSettingsButtonClicked);
+        if (_settingsScrim != null)
+            _settingsScrim.UnregisterCallback<ClickEvent>(OnSettingsScrimClicked);
+        if (_settingsDrawer != null)
+            _settingsDrawer.UnregisterCallback<ClickEvent>(OnSettingsDrawerBackgroundClicked);
+
+        foreach (var item in _settingsMenuItems)
+        {
+            if (item != null)
+                item.UnregisterCallback<ClickEvent>(OnSettingsMenuItemClicked);
+        }
+
+        _settingsMenuItems.Clear();
+        _settingsButton = null;
+        _settingsScrim = null;
+        _settingsDrawer = null;
+        _webViewOverlay = null;
     }
 
-    // ── 工具方法 ─────────────────────────────────────────────
-
-    private static int SeverityLevel(string severity) => severity?.ToLower() switch
+    void OnSettingsButtonClicked(ClickEvent evt)
     {
-        "warning" => 1,
-        "error" => 2,
-        "critical" => 3,
-        _ => 0
-    };
+        evt.StopPropagation();
+        ShowSettingsDrawer();
+    }
 
-    private static void SetSafe(Label lbl, string text)
+    void OnSettingsScrimClicked(ClickEvent evt)
     {
-        if (lbl != null) lbl.text = text;
+        evt.StopPropagation();
+        HideSettingsDrawer();
+    }
+
+    void OnSettingsDrawerBackgroundClicked(ClickEvent evt)
+    {
+        evt.StopPropagation();
+        HideSettingsDrawer();
+    }
+
+    void OnSettingsMenuItemClicked(ClickEvent evt)
+    {
+        evt.StopPropagation();
+        if (evt.currentTarget is not VisualElement selectedItem)
+            return;
+
+        foreach (var item in _settingsMenuItems)
+            item.RemoveFromClassList("settings-menu-item--selected");
+
+        selectedItem.AddToClassList("settings-menu-item--selected");
+    }
+
+    void ShowSettingsDrawer()
+    {
+        _webViewOverlay?.SetGlobalVisibility(false);
+        _settingsScrim?.RemoveFromClassList("settings-hidden");
+        _settingsDrawer?.RemoveFromClassList("settings-hidden");
+    }
+
+    void HideSettingsDrawer()
+    {
+        _settingsScrim?.AddToClassList("settings-hidden");
+        _settingsDrawer?.AddToClassList("settings-hidden");
+        _webViewOverlay?.SetGlobalVisibility(true);
+    }
+
+    void BindTelemetryLabels()
+    {
+        _telemetryLabels.Clear();
+
+        var document = GetComponent<UIDocument>();
+        if (document == null)
+            return;
+
+        var root = document.rootVisualElement;
+        foreach (TelemetryField field in Enum.GetValues(typeof(TelemetryField)))
+        {
+            string elementName = GetTelemetryElementName(field);
+            var label = root.Q<Label>(elementName);
+            if (label == null)
+            {
+                Debug.LogWarning($"[UI] UXML 中找不到遥测标签: {elementName}");
+                continue;
+            }
+
+            _telemetryLabels[field] = label;
+        }
+    }
+
+    void FlushTelemetryUpdates()
+    {
+        while (_pendingTelemetryUpdates.TryDequeue(out var update))
+        {
+            if (_telemetryLabels.TryGetValue(update.Field, out var label))
+            {
+                label.text = string.IsNullOrEmpty(update.Text) ? "--" : update.Text;
+                ApplyTelemetryLevel(label, update.Level);
+            }
+
+            TelemetryValueChanged?.Invoke(update);
+        }
+    }
+
+    static void ApplyTelemetryLevel(Label label, TelemetryLevel level)
+    {
+        label.RemoveFromClassList("telemetry-value");
+        label.RemoveFromClassList("telemetry-ok");
+        label.RemoveFromClassList("telemetry-warning");
+        label.RemoveFromClassList("telemetry-error");
+
+        switch (level)
+        {
+            case TelemetryLevel.Good:
+                label.AddToClassList("telemetry-ok");
+                break;
+            case TelemetryLevel.Warning:
+                label.AddToClassList("telemetry-warning");
+                break;
+            case TelemetryLevel.Error:
+                label.AddToClassList("telemetry-error");
+                break;
+            default:
+                label.AddToClassList("telemetry-value");
+                break;
+        }
+    }
+
+    static string GetTelemetryElementName(TelemetryField field)
+    {
+        return field switch
+        {
+            TelemetryField.SensorRtk => "telemetry-sensor-rtk",
+            TelemetryField.SensorImu => "telemetry-sensor-imu",
+            TelemetryField.SensorLidar => "telemetry-sensor-lidar",
+            TelemetryField.SensorCamera => "telemetry-sensor-camera",
+            TelemetryField.SensorRadar => "telemetry-sensor-radar",
+            TelemetryField.BaseSignal => "telemetry-base-signal",
+            TelemetryField.BasePing => "telemetry-base-ping",
+            TelemetryField.BaseThroughput => "telemetry-base-throughput",
+            TelemetryField.BasePacketLoss => "telemetry-base-packet-loss",
+            TelemetryField.BaseRssi => "telemetry-base-rssi",
+            TelemetryField.NetworkRssi => "telemetry-network-rssi",
+            TelemetryField.NetworkOperator => "telemetry-network-operator",
+            TelemetryField.NetworkSim => "telemetry-network-sim",
+            TelemetryField.ComputeCpu => "telemetry-compute-cpu",
+            TelemetryField.ComputeGpu => "telemetry-compute-gpu",
+            TelemetryField.ComputeMemory => "telemetry-compute-memory",
+            TelemetryField.ComputeBoardTemperature => "telemetry-compute-board-temperature",
+            TelemetryField.ComputeFan => "telemetry-compute-fan",
+            TelemetryField.ComputePower => "telemetry-compute-power",
+            TelemetryField.ComputeVoltage => "telemetry-compute-voltage",
+            TelemetryField.ComputeCurrent => "telemetry-compute-current",
+            TelemetryField.PowerCabinetTemperature => "telemetry-power-cabinet-temperature",
+            TelemetryField.PowerExternalFan => "telemetry-power-external-fan",
+            TelemetryField.PowerBattery => "telemetry-power-battery",
+            TelemetryField.PowerDevicePower => "telemetry-power-device-power",
+            _ => throw new ArgumentOutOfRangeException(nameof(field), field, null)
+        };
+    }
+
+    void UpdateStateLabel()
+    {
+        if (_stateLabel == null)
+            return;
+
+        _stateLabel.text = CurrentState switch
+        {
+            VehicleMotionState.LeftTurn => "当前：左转",
+            VehicleMotionState.Forward => "当前：前进",
+            VehicleMotionState.RightTurn => "当前：右转",
+            VehicleMotionState.RearTurn => "当前：后退",
+            VehicleMotionState.RearLeftTurn => "当前：后退左转",
+            VehicleMotionState.RearRightTurn => "当前：后退右转",
+            _ => "当前：静止"
+        };
     }
 }
