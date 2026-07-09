@@ -67,7 +67,7 @@
             <ui:VisualElement name="settings-scrim" class="settings-scrim settings-hidden" />
             <ui:VisualElement name="settings-drawer" class="settings-drawer settings-hidden">
                 <ui:VisualElement class="settings-menu">
-                    <ui:VisualElement name="settings-menu-display" class="settings-menu-item settings-menu-item--selected">
+                    <ui:VisualElement name="settings-menu-display" class="settings-menu-item">
                         <ui:Label text="显示与视图" class="settings-menu-label" />
                         <ui:Label text="›" class="settings-menu-arrow" />
                     </ui:VisualElement>

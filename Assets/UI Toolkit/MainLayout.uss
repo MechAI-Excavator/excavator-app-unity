@@ -1101,8 +1101,7 @@ TemplateContainer {
     opacity: 0.62;
 }
 
-.settings-menu-item:hover,
-.settings-menu-item--selected {
+.settings-menu-item:hover {
     background-color: rgba(13, 72, 186, 0.62);
     opacity: 1;
 }
@@ -1115,8 +1114,7 @@ TemplateContainer {
     -unity-text-align: middle-right;
 }
 
-.settings-menu-item:hover .settings-menu-label,
-.settings-menu-item--selected .settings-menu-label {
+.settings-menu-item:hover .settings-menu-label {
     color: #ffffff;
 }
 

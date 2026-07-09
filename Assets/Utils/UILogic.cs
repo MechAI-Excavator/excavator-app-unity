@@ -353,13 +353,6 @@ public class UILogic : MonoBehaviour
     void OnSettingsMenuItemClicked(ClickEvent evt)
     {
         evt.StopPropagation();
-        if (evt.currentTarget is not VisualElement selectedItem)
-            return;
-
-        foreach (var item in _settingsMenuItems)
-            item.RemoveFromClassList("settings-menu-item--selected");
-
-        selectedItem.AddToClassList("settings-menu-item--selected");
     }
 
     void ShowSettingsDrawer()
