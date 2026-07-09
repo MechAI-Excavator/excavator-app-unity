@@ -813,6 +813,7 @@ TemplateContainer {
     background-image: resource("settingIcon");
     -unity-background-scale-mode: scale-to-fit;
     opacity: 0.92;
+    z-index: 20;
 }
 
 .settings-button:hover {
@@ -1059,6 +1060,8 @@ TemplateContainer {
     background-color: rgba(0, 0, 0, 0);
     opacity: 1;
     visibility: visible;
+    picking-mode: position;
+    z-index: 30;
     transition-property: opacity;
     transition-duration: 0.16s;
     transition-timing-function: ease-out;
@@ -1084,6 +1087,8 @@ TemplateContainer {
     opacity: 1;
     translate: 0 0;
     visibility: visible;
+    picking-mode: position;
+    z-index: 31;
     overflow: hidden;
     transition-property: opacity, translate;
     transition-duration: 0.22s;
@@ -1093,6 +1098,7 @@ TemplateContainer {
 .settings-hidden {
     opacity: 0;
     visibility: hidden;
+    picking-mode: ignore;
 }
 
 .settings-drawer.settings-hidden {
