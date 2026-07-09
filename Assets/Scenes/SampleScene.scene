@@ -1270,7 +1270,7 @@ ArticulationBody:
   m_GameObject: {fileID: 217970465}
   m_Enabled: 1
   serializedVersion: 5
-  m_Mass: 10000
+  m_Mass: 25
   m_ParentAnchorPosition: {x: 0, y: 0, z: 0}
   m_ParentAnchorRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
@@ -2171,7 +2171,7 @@ ArticulationBody:
   m_GameObject: {fileID: 767559184}
   m_Enabled: 1
   serializedVersion: 5
-  m_Mass: 9999
+  m_Mass: 9099
   m_ParentAnchorPosition: {x: 0, y: 0.17500007, z: 0.86390996}
   m_ParentAnchorRotation: {x: 0, y: 0, z: -0.7071068, w: 0.7071068}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
@@ -2369,7 +2369,7 @@ ArticulationBody:
   m_GameObject: {fileID: 770848867}
   m_Enabled: 1
   serializedVersion: 5
-  m_Mass: 90.1137
+  m_Mass: 9000
   m_ParentAnchorPosition: {x: 0, y: 0.21000004, z: 0.47500002}
   m_ParentAnchorRotation: {x: 0.0000018179417, y: -1.0000001, z: 6.4801498e-12, w: -0.0000036199904}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
@@ -2844,6 +2844,7 @@ MonoBehaviour:
   distance: 5
   rotationSpeed: 0.2
   zoomSpeed: 2
+  ignoreInputOverUi: 1
 --- !u!114 &963194230
 MonoBehaviour:
   m_ObjectHideFlags: 0
