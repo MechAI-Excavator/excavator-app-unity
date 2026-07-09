@@ -24,6 +24,7 @@
                     <ui:VisualElement class="indicator-image indicator-outer" />
                     <ui:VisualElement class="indicator-image indicator-horizontal" />
                     <ui:VisualElement class="indicator-image indicator-forward" />
+                    <ui:VisualElement class="indicator-image navigation-arrow" />
                 </ui:VisualElement>
 
                 <ui:VisualElement name="heading-indicator" class="indicator heading-indicator">
@@ -33,6 +34,7 @@
 
                 <ui:VisualElement name="pitch-indicator" class="indicator pitch-indicator">
                     <ui:VisualElement class="indicator-image pitch-image" />
+                    <ui:VisualElement class="pitch-level-bar" />
                 </ui:VisualElement>
             </ui:VisualElement>
 

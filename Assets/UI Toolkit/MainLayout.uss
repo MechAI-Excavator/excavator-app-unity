@@ -915,6 +915,14 @@ TemplateContainer {
     background-image: resource("direction_forwar_indication");
 }
 
+.navigation-arrow {
+    left: 109px;
+    top: 109px;
+    width: 42px;
+    height: 42px;
+    background-image: resource("navigationArrow");
+}
+
 .heading-indicator {
     left: 0;
     top: 280px;
@@ -941,16 +949,26 @@ TemplateContainer {
 .pitch-indicator {
     left: 270px;
     top: 356px;
-    width: 120px;
-    height: 107px;
+    width: 125px;
+    height: 111.5px;
 }
 
 .pitch-image {
     left: 0;
     top: 0;
-    width: 120px;
-    height: 107px;
+    width: 125px;
+    height: 111.5px;
     background-image: resource("Outer_layer_indication_bottom_right");
+}
+
+.pitch-level-bar {
+    position: absolute;
+    left: 10.75px;
+    top: 52.25px;
+    width: 90px;
+    height: 7px;
+    background-image: resource("horizontal_metric_line");
+    -unity-background-scale-mode: scale-to-fit;
 }
 
 .arm-card {

@@ -5522,8 +5522,6 @@ GameObject:
   - component: {fileID: 1967017548}
   - component: {fileID: 1967017550}
   - component: {fileID: 1967017552}
-  - component: {fileID: 1967017553}
-  - component: {fileID: 1967017554}
   - component: {fileID: 1967017555}
   m_Layer: 5
   m_HasEditorInfo: 1
@@ -5589,60 +5587,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1e13cf74ab38f443d85fb5aa69923c0c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &1967017553
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1967017547}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d7fe89c7ba7e4c178284cc98608d014, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  iceServers: []
-  videoWidth: 640
-  videoHeight: 480
-  reconnectDelay: 3
-  streams:
-  - whepUrl: http://127.0.0.1:8889/left3Url/whep
-    containerName: video-feed-left
-    statusLabelName: lbl-video-feed-left
-  - whepUrl: http://127.0.0.1:8889/authorizationUrl/whep
-    containerName: video-feed-right
-    statusLabelName: lbl-video-feed-right
-  - whepUrl: http://127.0.0.1:8889/authorizationUrl2/whep
-    containerName: video-center-1
-    statusLabelName: lbl-video-center-1
-  - whepUrl: http://127.0.0.1:8889/left4Url/whep
-    containerName: video-center-2
-    statusLabelName: lbl-video-center-2
-  - whepUrl: http://127.0.0.1:8889/left4Url/whep
-    containerName: video-center-3
-    statusLabelName: lbl-video-center-3
-  - whepUrl: http://127.0.0.1:8889/left4Url/whep
-    containerName: video-feed-right2
-    statusLabelName: lbl-video-feed-right2
-  - whepUrl: http://127.0.0.1:8889/left4Url/whep
-    containerName: video-feed-left2
-    statusLabelName: lbl-video-feed-left2
---- !u!114 &1967017554
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1967017547}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3be9a647650e34ea4b09dff6c70303bc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  mapSize: 512
-  windowMeters: 60
-  trailMax: 600
-  backgroundTexture: {fileID: 0}
 --- !u!114 &1967017555
 MonoBehaviour:
   m_ObjectHideFlags: 0

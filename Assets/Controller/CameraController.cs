@@ -19,7 +19,6 @@ public class CameraController : MonoBehaviour
     void LateUpdate()
     {
         if (target == null) return;
-        if (OSMMapElement.IsPointerOverMap) return;
 
         if (Input.GetMouseButton(0))
         {
