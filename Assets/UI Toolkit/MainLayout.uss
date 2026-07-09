@@ -959,6 +959,7 @@ TemplateContainer {
     width: 125px;
     height: 111.5px;
     background-image: resource("Outer_layer_indication_bottom_right");
+    -unity-background-scale-mode: stretch-to-fill;
 }
 
 .pitch-level-bar {

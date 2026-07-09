@@ -15,7 +15,7 @@
             <ui:VisualElement name="map-card" class="glass-card map-card">
                 <ui:Label text="位置地图" class="panel-heading" />
                 <ui:VisualElement name="map-webview" class="webview-slot map-webview">
-                    <ui:Label text="excavator-map" class="webview-placeholder" />
+                    <!-- <ui:Label text="excavator-map" class="webview-placeholder" /> -->
                 </ui:VisualElement>
             </ui:VisualElement>
 
@@ -40,7 +40,7 @@
 
             <ui:VisualElement name="arm-card" class="arm-card">
                 <ui:VisualElement name="arm-webview" class="webview-slot arm-webview">
-                    <ui:Label text="2d-excavator" class="webview-placeholder" />
+
                 </ui:VisualElement>
                 <ui:VisualElement class="arm-readouts">
                     <ui:VisualElement class="arm-row">
