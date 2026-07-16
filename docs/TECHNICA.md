@@ -2,7 +2,7 @@
 
 ### 总览
 本项目是一个基于 Unity 的“挖掘机数字孪生”应用，集成了：
-- **MQTT**：遥测/控制（`01/sensor/rtk_lio`、`01/joint_control`、`01/map/elevation`、`01/status`）
+- **MQTT**：遥测/高程/关节（`01/sensor/rtk_lio`、`01/map/elevation`、`01/joints`、`01/status`）
 - **ArticulationBody**：挖掘机关节与底盘（RTK 位姿 + 关节驱动）
 - **地形高程渲染**：单 Terrain 更新与 **Tile 流式地形**
 - **OSM 小地图渲染**：离线 `.osm` 文件绘制到 UI Toolkit
@@ -29,7 +29,6 @@
 
 主要输出：
 - RTK → 挖掘机根位姿更新
-- Joint control → 关节目标更新
 - Elevation → Terrain tile 更新
 - System status → UI 更新事件
 
@@ -40,8 +39,7 @@
   - RTK 位姿平滑：`TeleportRoot` + Lerp/Slerp
 
 输入来源：
-- `MqttManager` **直接调用**：`ApplyRtkPose(...)`
-- `MqttManager` **直接调用**：`ApplyJointControl(...)`
+- `MqttManager` **直接调用**：`ApplyRtkRotation(...)`、`ApplyElevationOrigin(...)`、`ApplyJointAngles(...)`
 
 #### 3) 地形高程（Terrain Elevation）
 - **Tile 管理**：`Assets/Terrain/TerrainTileManager.cs`
@@ -100,11 +98,11 @@ flowchart LR
 ```mermaid
 flowchart TD
   T1["01/sensor/rtk_lio"] -->|JsonUtility| RTK[RtkGpsMsg]
-  RTK -->|直接调用| EX1[ExcavatorController.ApplyRtkPose]
+  RTK -->|直接调用| EX1[ExcavatorController.ApplyRtkRotation]
   RTK -->|事件(可选)| OBS1[地图/记录/观察者]
 
-  T2["01/joint_control"] -->|JsonUtility| JC[JointControlMsg]
-  JC -->|直接调用| EX2[ExcavatorController.ApplyJointControl]
+  T2["01/joints"] -->|JsonUtility| J[JointsMsg]
+  J -->|相对父关节角度| EX2[ExcavatorController.ApplyJointAngles]
 
   T3["01/map/elevation"] -->|JsonUtility| EL[ElevationMsg]
   EL -->|直接调用| TM[TerrainTileManager.OnElevationTile]
@@ -176,8 +174,9 @@ flowchart TD
 - 对时序/一致性敏感（控制链路应明确、可调试）
 
 例子：
-- RTK 位姿 → `ExcavatorController.ApplyRtkPose(...)`
-- 关节控制 → `ExcavatorController.ApplyJointControl(...)`
+- RTK 朝向 → `ExcavatorController.ApplyRtkRotation(...)`
+- 高程 origin → `ExcavatorController.ApplyElevationOrigin(...)`
+- 关节角度 → `ExcavatorController.ApplyJointAngles(...)`
 - 高程 tile → `TerrainTileManager.OnElevationTile(...)`
 
 原因：
@@ -185,7 +184,7 @@ flowchart TD
 - 控制链路短、定位问题更容易
 
 经验法则：
-- **观察/展示（UI）用事件；仿真控制（地形/位姿/关节）用直接调用。**
+- **观察/展示（UI）用事件；仿真控制（地形/位姿）用直接调用。**
 
 ---
 

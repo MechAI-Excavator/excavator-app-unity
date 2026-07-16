@@ -28,7 +28,7 @@ public class MqttManager : MonoBehaviour
 
     [Header("Topics")]
     [Tooltip("启动时自动订阅的主题列表")]
-    public string[] subscribeTopics = { "excavator/sensor", "01/map/elevation", "01/sensor/rtk_lio", "01/joint_control" };
+    public string[] subscribeTopics = { "excavator/sensor", "01/map/elevation", "01/sensor/rtk_lio", "01/joints" };
 
     [Tooltip("发布数据的默认主题")]
     public string publishTopic = "excavator_001/control";
@@ -183,8 +183,8 @@ public class MqttManager : MonoBehaviour
             case "01/sensor/rtk_lio":
                 HandleRtkLio(msg);
                 break;
-            case "01/joint_control":
-                HandleJointControl(msg);
+            case "01/joints":
+                HandleJoints(msg);
                 break;
         }
     }
@@ -245,14 +245,16 @@ public class MqttManager : MonoBehaviour
         }
     }
 
-    private void HandleJointControl(string msg)
+    private void HandleJoints(string msg)
     {
         try
         {
-            var data = JsonUtility.FromJson<JointControlMsg>(msg);
-            if (data?.joints == null)
+            var data = JsonUtility.FromJson<JointsMsg>(msg);
+            if (data?.joints?.boom == null
+                || data.joints.stick == null
+                || data.joints.bucket == null)
             {
-                Debug.LogWarning("[MQTT] 关节控制数据解析失败或 joints 为空");
+                Debug.LogWarning("[MQTT] 01/joints 解析失败，缺少 boom/stick/bucket 角度");
                 return;
             }
 
@@ -261,21 +263,22 @@ public class MqttManager : MonoBehaviour
 
             if (_excavatorController != null)
             {
-                _excavatorController.ApplyJointControl(
-                    data.joints.cabin.pwm,
-                    data.joints.boom.pwm,
-                    data.joints.stick.pwm,
-                    data.joints.bucket.pwm
-                );
+                // The reported angles are relative to each joint's parent link. Feeding
+                // them to the articulation drives lets Unity evaluate forward kinematics.
+                // Cabin and velocity are intentionally ignored for now.
+                _excavatorController.ApplyJointAngles(
+                    data.joints.boom.angle,
+                    data.joints.stick.angle,
+                    data.joints.bucket.angle);
             }
             else
             {
-                Debug.LogWarning("[MQTT] 场景中未找到 ExcavatorController，无法应用关节控制");
+                Debug.LogWarning("[MQTT] 场景中未找到 ExcavatorController，无法应用 01/joints");
             }
         }
         catch (Exception e)
         {
-            Debug.LogError($"[MQTT] 关节控制解析异常: {e.Message}");
+            Debug.LogError($"[MQTT] 01/joints 解析异常: {e.Message}");
         }
     }
 
@@ -352,28 +355,29 @@ public class MqttManager : MonoBehaviour
     }
 }
 
+// ── 关节正运动学消息 ─────────────────────────────────────────
+
 [Serializable]
-public class JointState
+public class JointKinematicsState
 {
-    public float pwm;
+    public float angle;
+    public float velocity;
 }
 
 [Serializable]
-public class JointsPayload
+public class JointKinematicsPayload
 {
-    public JointState cabin;
-    public JointState boom;
-    public JointState stick;
-    public JointState bucket;
-    public JointState leftTrack;
-    public JointState rightTrack;
+    public JointKinematicsState bucket;
+    public JointKinematicsState stick;
+    public JointKinematicsState boom;
+    public JointKinematicsState cabin;
 }
 
 [Serializable]
-public class JointControlMsg
+public class JointsMsg
 {
     public double timestamp;
-    public JointsPayload joints;
+    public JointKinematicsPayload joints;
 }
 
 // ── 系统状态消息 ─────────────────────────────────────────────

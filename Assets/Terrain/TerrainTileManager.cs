@@ -75,10 +75,31 @@ public class TerrainTileManager : MonoBehaviour
         for (int i = _pool.Count; i < need; i++)
         {
             var inst = Instantiate(terrainPrefab, Vector3.zero, Quaternion.identity, transform);
+            CloneTerrainDataForRuntime(inst, i);
             inst.gameObject.name = $"TerrainTile_{i}";
             inst.gameObject.SetActive(false);
             _pool.Enqueue(inst);
         }
+    }
+
+    /// <summary>
+    /// A Terrain prefab keeps a reference to its TerrainData asset when instantiated.
+    /// SetHeights would otherwise modify that asset in Play Mode, and every pooled tile
+    /// would also overwrite the same heightmap. Give each runtime tile its own copy.
+    /// </summary>
+    static void CloneTerrainDataForRuntime(Terrain terrain, int index)
+    {
+        if (terrain == null || terrain.terrainData == null) return;
+
+        var source = terrain.terrainData;
+        var runtimeData = Instantiate(source);
+        runtimeData.name = $"{source.name}_Runtime_{index}";
+        runtimeData.hideFlags = HideFlags.DontSave;
+        terrain.terrainData = runtimeData;
+
+        var terrainCollider = terrain.GetComponent<TerrainCollider>();
+        if (terrainCollider != null)
+            terrainCollider.terrainData = runtimeData;
     }
 
     Vector2Int WorldToTile(Vector3 worldPos)
