@@ -213,7 +213,7 @@ public class HandleElevationMap : MonoBehaviour
         int w = msg.metadata.width;
         int h = msg.metadata.height;
         int total = w * h;
-        const int NODATA = -32768;
+        int noData = msg.metadata.invalid_value;
 
         // ── 第一遍：扫描实际 min/max（跳过 nodata） ──
         int rawMin = int.MaxValue;
@@ -221,7 +221,7 @@ public class HandleElevationMap : MonoBehaviour
         for (int i = 0; i < total; i++)
         {
             int v = msg.data[i];
-            if (v == NODATA) continue;
+            if (v == noData) continue;
             if (v < rawMin) rawMin = v;
             if (v > rawMax) rawMax = v;
         }
@@ -271,7 +271,7 @@ public class HandleElevationMap : MonoBehaviour
             for (int x = 0; x < w; x++)
             {
                 int raw = msg.data[GetDataIndex(x, y, w, h)];
-                if (raw == NODATA) raw = rawMin;
+                if (raw == noData) raw = rawMin;
 
                 float meters = raw * hr;
                 // Height uses this tile's own range -> correct terrain surface.

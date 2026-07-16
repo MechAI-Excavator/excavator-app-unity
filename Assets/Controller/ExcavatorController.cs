@@ -34,6 +34,9 @@ public class ExcavatorController : MonoBehaviour
     [Tooltip("旋转插值速度，越大跟随越快")]
     public float rotationLerpSpeed = 8f;
 
+    [Tooltip("仅当 origin 也使用后端栅格的反向轴时开启。global/ENU origin 应保持关闭。")]
+    public bool rotateElevationOriginWithHeightmap = false;
+
     [Header("地面吸附")]
     [Tooltip("开启后：目标高度只从地形采样，忽略 RTK 里的高度（否则与场景地形不一致时会逐渐飘空/入地）")]
     public bool snapToGround = true;
@@ -61,9 +64,9 @@ public class ExcavatorController : MonoBehaviour
     private float _targetStick;
     private float _targetBucket;
 
-    private Vector3 _rtkTargetPos;
-    private Quaternion _rtkTargetRot;
-    private bool _rtkReady;
+    private Vector3 _targetBasePosition;
+    private Quaternion _targetBaseRotation;
+    private bool _basePoseReady;
 
     // 挖掘机的根 ArticulationBody（base link），
     // 位姿通过 TeleportRoot 设置
@@ -72,8 +75,8 @@ public class ExcavatorController : MonoBehaviour
     void Awake()
     {
         _rootBody = GetComponent<ArticulationBody>();
-        _rtkTargetPos = transform.position;
-        _rtkTargetRot = transform.rotation;
+        _targetBasePosition = transform.position;
+        _targetBaseRotation = transform.rotation;
     }
 
     // ── 关节控制 API ─────────────────────────────────────────
@@ -94,7 +97,7 @@ public class ExcavatorController : MonoBehaviour
     // ── RTK 位姿 API ────────────────────────────────────────
 
     /// <summary>
-    /// 由 MqttManager 调用，传入 RTK 相对位移（米）和 ENU 四元数。
+    /// 兼容旧调用：传入 RTK 相对位移（米）和 ENU 四元数。
     /// RTK 坐标系 ENU: x=东, y=北, z=上
     /// Unity 坐标系:     x=右, y=上, z=前
     /// 转换: Unity.x = ENU.x, Unity.y = ENU.z, Unity.z = ENU.y
@@ -103,7 +106,7 @@ public class ExcavatorController : MonoBehaviour
     {
         if (translation != null)
         {
-            _rtkTargetPos = new Vector3(
+            _targetBasePosition = new Vector3(
                 translation.x * worldScale,
                 translation.z * worldScale,
                 translation.y * worldScale
@@ -113,10 +116,66 @@ public class ExcavatorController : MonoBehaviour
         if (rotation != null)
         {
             var enu = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
-            _rtkTargetRot = EnuToUnity(enu);
+            _targetBaseRotation = EnuToUnity(enu);
         }
 
-        _rtkReady = true;
+        _basePoseReady = true;
+    }
+
+    /// <summary>
+    /// Updates only the base rotation from RTK. Position is supplied by elevation metadata.origin.
+    /// </summary>
+    public void ApplyRtkRotation(RtkRotation rotation)
+    {
+        if (rotation == null) return;
+
+        var enu = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+        _targetBaseRotation = EnuToUnity(enu);
+        _basePoseReady = true;
+    }
+
+    /// <summary>
+    /// Places the excavator at an ENU offset, in metres, from the elevation tile center.
+    /// ENU x/y/z maps to Unity x/z/y. The planar offset follows the heightmap's 180-degree
+    /// orientation correction when that correction is enabled on the tile.
+    /// </summary>
+    public void ApplyElevationOrigin(
+        ElevationOrigin origin,
+        Terrain referenceTerrain,
+        string coordinateSystem = null)
+    {
+        if (origin == null || referenceTerrain == null || referenceTerrain.terrainData == null)
+            return;
+
+        float offsetX = origin.x;
+        float offsetZ = origin.y;
+
+        var elevationMap = referenceTerrain.GetComponent<HandleElevationMap>();
+        bool isGlobalCoordinates = string.Equals(
+            coordinateSystem,
+            "global",
+            System.StringComparison.OrdinalIgnoreCase);
+        if (!isGlobalCoordinates
+            && rotateElevationOriginWithHeightmap
+            && elevationMap != null
+            && elevationMap.rotateData180)
+        {
+            offsetX = -offsetX;
+            offsetZ = -offsetZ;
+        }
+
+        var terrainSize = referenceTerrain.terrainData.size;
+        Vector3 tileCenter = referenceTerrain.GetPosition()
+            + new Vector3(terrainSize.x * 0.5f, 0f, terrainSize.z * 0.5f);
+        Vector3 worldOffset = new Vector3(offsetX, origin.z, offsetZ) * worldScale;
+
+        _targetBasePosition = tileCenter + worldOffset;
+        _basePoseReady = true;
+
+        Debug.Log($"[Excavator] origin=({origin.x:F2},{origin.y:F2},{origin.z:F2})m " +
+                  $"terrainCenter=({tileCenter.x:F2},{tileCenter.z:F2}) " +
+                  $"target=({_targetBasePosition.x:F2},{_targetBasePosition.z:F2}) " +
+                  $"physicsRoot={name} container={transform.parent?.name}");
     }
 
     // ── FixedUpdate ─────────────────────────────────────────
@@ -154,19 +213,19 @@ public class ExcavatorController : MonoBehaviour
             Drive(bucket, bucketInput);
         }
 
-        // RTK 底盘位姿
-        if (_rtkReady)
-            ApplyRtkPoseSmooth();
+        // 高程图 origin 控制位置，RTK 控制朝向。
+        if (_basePoseReady)
+            ApplyBasePoseSmooth();
     }
 
-    // ── RTK 位姿平滑 ────────────────────────────────────────
+    // ── 底盘位姿平滑 ────────────────────────────────────────
 
-    private void ApplyRtkPoseSmooth()
+    private void ApplyBasePoseSmooth()
     {
         float dt = Time.fixedDeltaTime;
 
-        // X/Z from RTK. When snapping, ignore RTK altitude — it often drifts vs scene Terrain.
-        Vector3 targetPos = _rtkTargetPos;
+        // X/Z comes from elevation metadata.origin. Ground snapping owns the final height.
+        Vector3 targetPos = _targetBasePosition;
         if (snapToGround)
             targetPos.y = SampleGroundYAtXZ(targetPos.x, targetPos.z, transform.position.y);
 
@@ -187,7 +246,7 @@ public class ExcavatorController : MonoBehaviour
             _rootBody.velocity = new Vector3(horizVel.x, vy, horizVel.z);
 
             // Angular velocity from rotation error (clamped).
-            Quaternion rotErr = _rtkTargetRot * Quaternion.Inverse(transform.rotation);
+            Quaternion rotErr = _targetBaseRotation * Quaternion.Inverse(transform.rotation);
             rotErr.ToAngleAxis(out float angleDeg, out Vector3 axis);
             if (angleDeg > 180f) angleDeg -= 360f;
             if (axis.sqrMagnitude > 0.001f)
@@ -206,7 +265,7 @@ public class ExcavatorController : MonoBehaviour
         else
         {
             Vector3 pos = Vector3.Lerp(transform.position, targetPos, positionLerpSpeed * dt);
-            Quaternion rot = Quaternion.Slerp(transform.rotation, _rtkTargetRot, rotationLerpSpeed * dt);
+            Quaternion rot = Quaternion.Slerp(transform.rotation, _targetBaseRotation, rotationLerpSpeed * dt);
             transform.SetPositionAndRotation(pos, rot);
         }
     }

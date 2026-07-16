@@ -175,7 +175,6 @@ public class MqttManager : MonoBehaviour
         switch (topic)
         {
             case "01/map/elevation":
-                Debug.Log($"[MQTT] 高度图: {msg}");
                 HandleElevation(msg);
                 break;
             case "01/status":
@@ -236,10 +235,8 @@ public class MqttManager : MonoBehaviour
 
             if (_excavatorController != null)
             {
-                _excavatorController.ApplyRtkPose(
-                    rtk.position.relative?.translation,
-                    rtk.rotation
-                );
+                // Elevation metadata.origin now owns translation; RTK still owns orientation.
+                _excavatorController.ApplyRtkRotation(rtk.rotation);
             }
         }
         catch (Exception e)
@@ -292,16 +289,28 @@ public class MqttManager : MonoBehaviour
                 Debug.LogWarning("[MQTT] 高程图 JSON 解析失败或数据为空");
                 return;
             }
+
+            var metadata = elevation.metadata;
+            Debug.Log($"[MQTT] 高程图 seq={elevation.sequence} " +
+                      $"samples={metadata.width}x{metadata.height} " +
+                      $"tile=({metadata.tile_x},{metadata.tile_y}) size={metadata.tile_size_meters:F2}m " +
+                      $"origin=({metadata.origin?.x:F2},{metadata.origin?.y:F2},{metadata.origin?.z:F2})");
+
             var tileManager = FindFirstObjectByType<TerrainTileManager>();
             if (tileManager != null)
             {
-                tileManager.OnElevationTile(elevation);
+                var terrain = tileManager.OnElevationTile(elevation);
+                ApplyElevationOrigin(elevation, terrain);
                 return;
             }
 
             var handler = FindFirstObjectByType<HandleElevationMap>();
             if (handler != null)
+            {
                 handler.OnElevationDataReceived(elevation);
+                var terrain = handler.terrain != null ? handler.terrain : handler.GetComponent<Terrain>();
+                ApplyElevationOrigin(elevation, terrain);
+            }
             else
                 Debug.LogWarning("[MQTT] 场景中未找到 HandleElevationMap，无法更新地形");
         }
@@ -309,6 +318,37 @@ public class MqttManager : MonoBehaviour
         {
             Debug.LogError($"[MQTT] 高程图解析异常: {e.Message}");
         }
+    }
+
+    private void ApplyElevationOrigin(ElevationMsg elevation, Terrain terrain)
+    {
+        var metadata = elevation?.metadata;
+        if (metadata?.origin == null)
+            return; // Backward compatibility: old messages do not move the excavator.
+
+        if (!string.IsNullOrEmpty(metadata.origin_type)
+            && !string.Equals(metadata.origin_type, "center", StringComparison.OrdinalIgnoreCase))
+        {
+            Debug.LogWarning($"[MQTT] 不支持高程图 origin_type={metadata.origin_type}，期望 center；已忽略本次位置更新");
+            return;
+        }
+
+        if (terrain == null)
+        {
+            Debug.LogWarning("[MQTT] 已收到高程图 origin，但无法确定对应 Terrain，未更新挖掘机位置");
+            return;
+        }
+
+        if (_excavatorController == null)
+            _excavatorController = FindFirstObjectByType<ExcavatorController>();
+
+        if (_excavatorController != null)
+            _excavatorController.ApplyElevationOrigin(
+                metadata.origin,
+                terrain,
+                metadata.coordinate_system);
+        else
+            Debug.LogWarning("[MQTT] 场景中未找到 ExcavatorController，无法应用高程图 origin");
     }
 }
 

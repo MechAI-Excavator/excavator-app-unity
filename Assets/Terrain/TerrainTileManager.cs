@@ -36,6 +36,7 @@ public class TerrainTileManager : MonoBehaviour
 
     Vector2Int _centerTile;
     bool _centerInitialized;
+    bool _waitingForFollowTargetToEnterMessageTile;
 
     void Awake()
     {
@@ -49,6 +50,16 @@ public class TerrainTileManager : MonoBehaviour
     {
         if (followTarget == null) return;
         var t = WorldToTile(followTarget.position);
+
+        // A message can identify a tile before the followed excavator has moved into it.
+        // Keep that message tile active long enough for metadata.origin to drive the vehicle
+        // there; otherwise radius=0 would recycle it again on the very next frame.
+        if (_waitingForFollowTargetToEnterMessageTile)
+        {
+            if (t != _centerTile) return;
+            _waitingForFollowTargetToEnterMessageTile = false;
+        }
+
         if (!_centerInitialized || t != _centerTile)
         {
             _centerTile = t;
@@ -122,7 +133,10 @@ public class TerrainTileManager : MonoBehaviour
 
             var t = _pool.Dequeue();
             _active[key] = t;
-            t.transform.position = TileToWorldOrigin(key);
+            t.transform.SetPositionAndRotation(TileToWorldOrigin(key), Quaternion.identity);
+            // Unity Terrain size comes from TerrainData; inherited/prefab scaling corrupts
+            // both the rendered footprint and center-relative origin calculations.
+            t.transform.localScale = Vector3.one;
             t.gameObject.name = $"TerrainTile_{key.x}_{key.y}";
             t.gameObject.SetActive(true);
 
@@ -132,9 +146,13 @@ public class TerrainTileManager : MonoBehaviour
         }
     }
 
-    public void OnElevationTile(ElevationMsg msg)
+    /// <summary>
+    /// Applies an elevation message and returns the Terrain representing that message.
+    /// The returned Terrain lets callers resolve positions relative to this tile's center.
+    /// </summary>
+    public Terrain OnElevationTile(ElevationMsg msg)
     {
-        if (msg?.metadata == null) return;
+        if (msg?.metadata == null) return null;
 
         bool hasExplicitTile = msg.metadata.tile_size_meters > 0.1f;
         float messageSize = GetMessageSizeMeters(msg);
@@ -158,10 +176,24 @@ public class TerrainTileManager : MonoBehaviour
         }
 
         if (hasExplicitTile)
+        {
             store?.Put(key.x, key.y, msg);
 
+            // Explicit tile coordinates are authoritative for this message. This is
+            // especially important around world zero: an excavator at a small negative
+            // position belongs to tile (-1,-1), while the incoming map may already be (0,0).
+            if (!_active.ContainsKey(key))
+            {
+                _centerTile = key;
+                _centerInitialized = true;
+                _waitingForFollowTargetToEnterMessageTile = followTarget != null
+                    && WorldToTile(followTarget.position) != key;
+                RefreshActiveSet();
+            }
+        }
+
         // Ensure tile is active (center around it if we don't have a followTarget).
-        if (followTarget == null)
+        if (!hasExplicitTile && followTarget == null)
         {
             if (!_centerInitialized || key != _centerTile || _active.Count == 0)
             {
@@ -172,7 +204,12 @@ public class TerrainTileManager : MonoBehaviour
         }
 
         if (_active.TryGetValue(key, out var terrain) && terrain != null)
+        {
             ApplyToTerrain(terrain, msg);
+            return terrain;
+        }
+
+        return null;
     }
 
     /// <summary>
