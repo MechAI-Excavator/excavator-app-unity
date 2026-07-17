@@ -1367,13 +1367,13 @@ MonoBehaviour:
   jointsTopicControlEnabled: 1
   boomJointCalibration:
     scale: -1
-    offsetDegrees: 26.2257
+    offsetDegrees: -140
   stickJointCalibration:
     scale: 1
-    offsetDegrees: 0
+    offsetDegrees: -140
   bucketJointCalibration:
     scale: 1
-    offsetDegrees: 0
+    offsetDegrees: -140
   logJointsDebug: 0
   jointsDebugLogInterval: 1
   worldScale: 1
@@ -1394,6 +1394,7 @@ MonoBehaviour:
   stabilizedFootprintHalfExtents: {x: 0.75, y: 1.1}
   stabilizedGroundClearance: 0.03
   stabilizedHeightLerpSpeed: 5
+  ignoreArmTerrainCollisions: 1
 --- !u!4 &269132435 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 0bbd082af85bd46a9b84d52dcc79ba17,

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
@@ -106,6 +107,11 @@ public class ExcavatorController : MonoBehaviour
     [Tooltip("动态高程改变时，底盘高度的跟随速度。")]
     public float stabilizedHeightLerpSpeed = 5f;
 
+    [Header("铲臂与地面碰撞")]
+    [Tooltip("忽略 boom/stick/bucket 的 Collider 与 TerrainCollider 的物理接触。" +
+             "关节仍按 MQTT 运动，但碰到地形不会产生反弹或把冲量传回整车。")]
+    public bool ignoreArmTerrainCollisions = true;
+
     private float _targetBoomAngle;
     private float _targetStickAngle;
     private float _targetBucketAngle;
@@ -126,6 +132,8 @@ public class ExcavatorController : MonoBehaviour
     // 挖掘机的根 ArticulationBody（base link），
     // 位姿通过 TeleportRoot 设置
     private ArticulationBody _rootBody;
+    private readonly HashSet<Collider> _armColliders = new();
+    private bool _armTerrainPolicyLogged;
 
     void Awake()
     {
@@ -146,6 +154,74 @@ public class ExcavatorController : MonoBehaviour
             _rootBody.immovable = true;
             _rootBody.velocity = Vector3.zero;
             _rootBody.angularVelocity = Vector3.zero;
+        }
+    }
+
+    void Start()
+    {
+        // TerrainTileManager creates its pooled Terrain objects during Awake. Configure the
+        // active collider pairs in Start so script execution order cannot leave the first tile
+        // physically colliding with the arm.
+        RefreshArmTerrainCollisionPolicy();
+    }
+
+    /// <summary>
+    /// Applies the arm/terrain collision policy to all currently active TerrainColliders.
+    /// TerrainTileManager calls this again whenever a pooled tile is reactivated because
+    /// Physics.IgnoreCollision is a runtime collider-pair setting.
+    /// </summary>
+    public void RefreshArmTerrainCollisionPolicy()
+    {
+        _armColliders.Clear();
+        CollectLinkColliders(boom, _armColliders);
+        CollectLinkColliders(stick, _armColliders);
+        CollectLinkColliders(bucket, _armColliders);
+
+        var terrainColliders = FindObjectsByType<TerrainCollider>(FindObjectsSortMode.None);
+        int configuredPairs = 0;
+        foreach (var terrainCollider in terrainColliders)
+        {
+            if (terrainCollider == null
+                || !terrainCollider.enabled
+                || !terrainCollider.gameObject.activeInHierarchy)
+                continue;
+
+            foreach (var armCollider in _armColliders)
+            {
+                if (armCollider == null
+                    || !armCollider.enabled
+                    || !armCollider.gameObject.activeInHierarchy)
+                    continue;
+
+                Physics.IgnoreCollision(
+                    armCollider,
+                    terrainCollider,
+                    ignoreArmTerrainCollisions);
+                configuredPairs++;
+            }
+        }
+
+        if (!_armTerrainPolicyLogged && configuredPairs > 0)
+        {
+            _armTerrainPolicyLogged = true;
+            string message =
+                $"[Excavator] 铲臂/地形碰撞策略：" +
+                $"ignore={ignoreArmTerrainCollisions}, armColliders={_armColliders.Count}, " +
+                $"terrainColliders={terrainColliders.Length}, pairs={configuredPairs}";
+            Debug.Log(message);
+        }
+    }
+
+    private static void CollectLinkColliders(
+        ArticulationBody link,
+        HashSet<Collider> destination)
+    {
+        if (link == null) return;
+
+        foreach (var linkCollider in link.GetComponentsInChildren<Collider>(true))
+        {
+            if (linkCollider != null && !(linkCollider is TerrainCollider))
+                destination.Add(linkCollider);
         }
     }
 

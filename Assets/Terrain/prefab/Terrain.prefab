@@ -145,6 +145,8 @@ MonoBehaviour:
   rebuildTerrainLayersEveryUpdate: 0
   useGlobalRangeForColoring: 0
   colorFromHeightmapRange: 1
+  skipUnchangedElevationFrames: 1
+  heightChangeEpsilon: 0.00001
   overlayGridTexture: 0
   gridTextureResolution: 128
   gridLineEveryPixels: 4

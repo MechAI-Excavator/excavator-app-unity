@@ -32,6 +32,13 @@ public class HandleElevationMap : MonoBehaviour
     [Tooltip("按本 tile 高度图 min/max 着色（推荐开启）：颜色与地表起伏一一对应，渐变明显。")]
     public bool colorFromHeightmapRange = true;
 
+    [Tooltip("跳过数据、尺寸和高程比例均未变化的重复 MQTT 帧。")]
+    public bool skipUnchangedElevationFrames = true;
+
+    [Tooltip("高度变化小于该归一化值时不写入 Terrain。用于抑制无意义的浮点微小变化。")]
+    [Range(0f, 0.01f)]
+    public float heightChangeEpsilon = 0.00001f;
+
     [Header("Surface Look")]
     [Tooltip("在每个高度色带的贴图上叠加栅格线（更有工程/测绘质感）。")]
     public bool overlayGridTexture = false;
@@ -137,6 +144,16 @@ public class HandleElevationMap : MonoBehaviour
     Coroutine _smoothCoroutine;
     Material _unlitHeightMaterial;
     Texture2D _unlitHeightTexture;
+    float[,] _lastTargetHeights;
+    RectInt _pendingHeightRect;
+    bool _hasPendingHeightRect;
+    ulong _lastPayloadHash;
+    bool _hasLastPayloadHash;
+    float _lastColorMin;
+    float _lastColorMax;
+    bool _hasLastColorRange;
+    float _nextInvalidFrameWarningTime;
+    bool _hasRenderedValidMap;
 
     void Reset()
     {
@@ -147,6 +164,16 @@ public class HandleElevationMap : MonoBehaviour
     {
         EnsureGradient();
         ApplySurfaceRenderSettings();
+    }
+
+    void OnValidate()
+    {
+        heightChangeEpsilon = Mathf.Max(0f, heightChangeEpsilon);
+        maxHeightDeltaPerFrame = Mathf.Max(0.000001f, maxHeightDeltaPerFrame);
+
+        // Inspector changes to the gradient or normalization settings must force one refresh.
+        _hasLastPayloadHash = false;
+        _hasLastColorRange = false;
     }
 
     void ApplySurfaceRenderSettings()
@@ -205,29 +232,80 @@ public class HandleElevationMap : MonoBehaviour
     /// <summary>由 MqttManager 在收到 01/map/elevation 时调用</summary>
     public void OnElevationDataReceived(ElevationMsg msg)
     {
-        if (msg.data_type != "int16") return;
+        if (msg?.metadata == null || msg.data == null || msg.data_type != "int16") return;
 
         // TerrainTileManager may assign the Terrain reference after Awake.
         ApplySurfaceRenderSettings();
+        if (!_hasRenderedValidMap && enableColoring && useUnlitHeightMaterial && terrain != null)
+            terrain.drawHeightmap = false;
 
         int w = msg.metadata.width;
         int h = msg.metadata.height;
+        if (w <= 0 || h <= 0) return;
+
         int total = w * h;
+        if (msg.data.Length < total)
+        {
+            Debug.LogWarning(
+                $"[HandleElevationMap] 高程数据长度不足: expected={total}, actual={msg.data.Length}");
+            return;
+        }
+
         int noData = msg.metadata.invalid_value;
 
-        // ── 第一遍：扫描实际 min/max（跳过 nodata） ──
+        // First pass: min/max plus a stable payload hash. Exact repeat frames can return
+        // before allocating arrays or touching TerrainData/Texture2D.
         int rawMin = int.MaxValue;
         int rawMax = int.MinValue;
+        ulong payloadHash = 1469598103934665603UL;
+        payloadHash = MixHash(payloadHash, w);
+        payloadHash = MixHash(payloadHash, h);
+        payloadHash = MixHash(payloadHash, noData);
+        payloadHash = MixHash(payloadHash, msg.metadata.height_resolution.GetHashCode());
+        payloadHash = MixHash(payloadHash, rotateData180 ? 1 : 0);
+        payloadHash = MixHash(payloadHash, colorFromHeightmapRange ? 1 : 0);
+        if (!colorFromHeightmapRange && useGlobalRangeForColoring)
+        {
+            payloadHash = MixHash(payloadHash, msg.metadata.min_elevation.GetHashCode());
+            payloadHash = MixHash(payloadHash, msg.metadata.max_elevation.GetHashCode());
+        }
+
         for (int i = 0; i < total; i++)
         {
             int v = msg.data[i];
+            payloadHash = MixHash(payloadHash, v);
             if (v == noData) continue;
             if (v < rawMin) rawMin = v;
             if (v > rawMax) rawMax = v;
         }
-        if (rawMin > rawMax) { rawMin = 0; rawMax = 1; }
+
+        if (rawMin > rawMax)
+        {
+            // Never erase a good map with an all-invalid frame.
+            if (Time.unscaledTime >= _nextInvalidFrameWarningTime)
+            {
+                _nextInvalidFrameWarningTime = Time.unscaledTime + 5f;
+                Debug.LogWarning(
+                    $"[HandleElevationMap] 高程帧 seq={msg.sequence} 全部为 invalid_value " +
+                    $"({noData})，已保留上一张有效地图");
+            }
+            return;
+        }
+
+        if (skipUnchangedElevationFrames
+            && _hasLastPayloadHash
+            && payloadHash == _lastPayloadHash)
+        {
+            return;
+        }
 
         float hr = msg.metadata.height_resolution;
+        if (hr <= 0f)
+        {
+            Debug.LogWarning($"[HandleElevationMap] 非法 height_resolution={hr}");
+            return;
+        }
+
         float actualMin = rawMin * hr;
         float actualMax = rawMax * hr;
         float range = actualMax - actualMin;
@@ -249,11 +327,11 @@ public class HandleElevationMap : MonoBehaviour
             terrainHeightAxis = td.size.y;
         }
 
-        // ── 第二遍：生成 heightmap + normalizedMap ──
+        // Second pass: build the new targets. The arrays are cheap (~80 KB for 100x100);
+        // the expensive Unity writes below are restricted to the dirty rectangle.
         float[,] heights = new float[h + 1, w + 1];
         float[,] normalizedMap = new float[h, w];
 
-        // For coloring (when not using heightmap min/max): meters-based normalization.
         float colorMin = actualMin;
         float colorRange = range;
         if (!colorFromHeightmapRange)
@@ -274,7 +352,6 @@ public class HandleElevationMap : MonoBehaviour
                 if (raw == noData) raw = rawMin;
 
                 float meters = raw * hr;
-                // Height uses this tile's own range -> correct terrain surface.
                 float heightVal = Mathf.Clamp01((meters - actualMin) / terrainHeightAxis);
 
                 heights[y, x] = heightVal;
@@ -282,64 +359,72 @@ public class HandleElevationMap : MonoBehaviour
                 if (x == w - 1) heights[y, x + 1] = heightVal;
                 if (y == h - 1 && x == w - 1) heights[y + 1, x + 1] = heightVal;
 
-                if (!colorFromHeightmapRange)
-                {
-                    float normalized = Mathf.Clamp01((meters - colorMin) / colorRange);
-                    normalizedMap[y, x] = normalized;
-                }
+                normalizedMap[y, x] = colorFromHeightmapRange
+                    ? Mathf.Clamp01((meters - actualMin) / range)
+                    : Mathf.Clamp01((meters - colorMin) / colorRange);
             }
         }
 
-        // Map 0–1 height samples to 0–1 color index so low/high on *this* tile always span the full gradient.
-        if (colorFromHeightmapRange)
+        RectInt dirtyRect = FindDirtyRect(_lastTargetHeights, heights, heightChangeEpsilon);
+
+        // A newer frame supersedes the target of the running coroutine. Preserve its pending
+        // region so samples that were still converging continue toward the new target.
+        StopSmoothHeightUpdate(td);
+        if (_hasPendingHeightRect)
+            dirtyRect = UnionRects(dirtyRect, _pendingHeightRect);
+
+        float colorMax = colorMin + colorRange;
+        bool colorRangeChanged = !_hasLastColorRange
+            || !Mathf.Approximately(_lastColorMin, colorMin)
+            || !Mathf.Approximately(_lastColorMax, colorMax);
+
+        RectInt colorRect = colorRangeChanged
+            ? new RectInt(0, 0, w, h)
+            : ClampRectToSize(dirtyRect, w, h);
+
+        // Color is independent of the collider smoothing. Upload it immediately so the
+        // Terrain never waits several seconds in its white/default-material state.
+        if (enableColoring && colorRect.width > 0 && colorRect.height > 0)
+            ApplyColoring(td, normalizedMap, w, h, colorRect);
+
+        if (terrain != null && (enableColoring || !smoothHeightUpdates))
         {
-            float minH = float.MaxValue;
-            float maxH = float.MinValue;
-            int rows = h + 1;
-            int cols = w + 1;
-            for (int iy = 0; iy < rows; iy++)
-            {
-                for (int ix = 0; ix < cols; ix++)
-                {
-                    float v = heights[iy, ix];
-                    if (v < minH) minH = v;
-                    if (v > maxH) maxH = v;
-                }
-            }
-
-            float span = Mathf.Max(maxH - minH, 1e-6f);
-            for (int y = 0; y < h; y++)
-            {
-                for (int x = 0; x < w; x++)
-                    normalizedMap[y, x] = (heights[y, x] - minH) / span;
-            }
+            terrain.drawHeightmap = true;
+            _hasRenderedValidMap = true;
         }
+
+        _lastColorMin = colorMin;
+        _lastColorMax = colorMax;
+        _hasLastColorRange = true;
+        _lastPayloadHash = payloadHash;
+        _hasLastPayloadHash = true;
+        _lastTargetHeights = heights;
+
+        if (!_loggedOnce && enableColoring)
+        {
+            _loggedOnce = true;
+            Debug.Log($"[HandleElevationMap] 即时着色已启用，heightmap={td.heightmapResolution} " +
+                      $"colorTexture={w}x{h}");
+        }
+
+        if (dirtyRect.width <= 0 || dirtyRect.height <= 0)
+            return;
 
         if (smoothHeightUpdates)
         {
-            // Stop any previous smooth coroutine so new data always wins.
-            if (_smoothCoroutine != null) StopCoroutine(_smoothCoroutine);
-            _smoothCoroutine = StartCoroutine(SmoothSetHeights(td, heights, normalizedMap, w, h));
-            return; // Coloring is applied inside the coroutine after heights converge.
+            _pendingHeightRect = dirtyRect;
+            _hasPendingHeightRect = true;
+            _smoothCoroutine = StartCoroutine(SmoothSetHeights(td, heights, dirtyRect));
+            return;
         }
 
-        td.SetHeights(0, 0, heights);
+        td.SetHeights(
+            dirtyRect.xMin,
+            dirtyRect.yMin,
+            ExtractPatch(heights, dirtyRect));
+        _hasPendingHeightRect = false;
+        _pendingHeightRect = default;
         NotifyTerrainHeightmapReady();
-
-        if (enableColoring)
-        {
-            ApplyColoring(td, normalizedMap, w, h);
-
-            if (!_loggedOnce)
-            {
-                _loggedOnce = true;
-                Debug.Log($"[HandleElevationMap] tile={name} layers={td.terrainLayers.Length} " +
-                          $"alphamap={td.alphamapWidth}x{td.alphamapHeight} " +
-                          $"color={elevationGradient.Evaluate(0.5f)} enableColoring={enableColoring}");
-            }
-        }
-
-        Debug.Log($"[HandleElevationMap] 实际高程范围: {actualMin:F2}m ~ {actualMax:F2}m");
     }
 
     int GetDataIndex(int x, int y, int width, int height)
@@ -362,53 +447,152 @@ public class HandleElevationMap : MonoBehaviour
 
     bool _loggedOnce;
 
-    IEnumerator SmoothSetHeights(TerrainData td, float[,] target, float[,] normalizedMap, int dataW, int dataH)
+    static ulong MixHash(ulong hash, int value)
     {
-        int rows = target.GetLength(0);
-        int cols = target.GetLength(1);
-        var current = td.GetHeights(0, 0, cols, rows);
+        hash ^= unchecked((uint)value);
+        return hash * 1099511628211UL;
+    }
+
+    static RectInt FindDirtyRect(float[,] previous, float[,] next, float epsilon)
+    {
+        int rows = next.GetLength(0);
+        int cols = next.GetLength(1);
+        if (previous == null
+            || previous.GetLength(0) != rows
+            || previous.GetLength(1) != cols)
+        {
+            return new RectInt(0, 0, cols, rows);
+        }
+
+        int minX = cols;
+        int minY = rows;
+        int maxX = -1;
+        int maxY = -1;
+        float threshold = Mathf.Max(0f, epsilon);
+
+        for (int y = 0; y < rows; y++)
+        {
+            for (int x = 0; x < cols; x++)
+            {
+                if (Mathf.Abs(next[y, x] - previous[y, x]) <= threshold)
+                    continue;
+
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+
+        return maxX < minX || maxY < minY
+            ? default
+            : new RectInt(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+
+    static RectInt UnionRects(RectInt a, RectInt b)
+    {
+        if (a.width <= 0 || a.height <= 0) return b;
+        if (b.width <= 0 || b.height <= 0) return a;
+
+        int minX = Mathf.Min(a.xMin, b.xMin);
+        int minY = Mathf.Min(a.yMin, b.yMin);
+        int maxX = Mathf.Max(a.xMax, b.xMax);
+        int maxY = Mathf.Max(a.yMax, b.yMax);
+        return new RectInt(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    static RectInt ClampRectToSize(RectInt rect, int width, int height)
+    {
+        int minX = Mathf.Clamp(rect.xMin, 0, width);
+        int minY = Mathf.Clamp(rect.yMin, 0, height);
+        int maxX = Mathf.Clamp(rect.xMax, minX, width);
+        int maxY = Mathf.Clamp(rect.yMax, minY, height);
+        return new RectInt(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    static float[,] ExtractPatch(float[,] source, RectInt rect)
+    {
+        var patch = new float[rect.height, rect.width];
+        for (int y = 0; y < rect.height; y++)
+        {
+            for (int x = 0; x < rect.width; x++)
+                patch[y, x] = source[rect.yMin + y, rect.xMin + x];
+        }
+        return patch;
+    }
+
+    void StopSmoothHeightUpdate(TerrainData td)
+    {
+        if (_smoothCoroutine == null) return;
+
+        StopCoroutine(_smoothCoroutine);
+        _smoothCoroutine = null;
+        FlushDelayedHeightmap(td);
+    }
+
+    void FlushDelayedHeightmap(TerrainData td)
+    {
+        // Sync every Terrain instance that shares this TerrainData. This is the current
+        // replacement for Terrain.ApplyDelayedHeightmapModification().
+        td.SyncHeightmap();
+    }
+
+    IEnumerator SmoothSetHeights(TerrainData td, float[,] target, RectInt dirtyRect)
+    {
+        var targetPatch = ExtractPatch(target, dirtyRect);
+        var current = td.GetHeights(
+            dirtyRect.xMin,
+            dirtyRect.yMin,
+            dirtyRect.width,
+            dirtyRect.height);
+        float maxStep = Mathf.Max(0.000001f, maxHeightDeltaPerFrame);
 
         while (true)
         {
             bool done = true;
-            for (int r = 0; r < rows; r++)
+            for (int r = 0; r < dirtyRect.height; r++)
             {
-                for (int c = 0; c < cols; c++)
+                for (int c = 0; c < dirtyRect.width; c++)
                 {
-                    float diff = target[r, c] - current[r, c];
-                    if (Mathf.Abs(diff) > maxHeightDeltaPerFrame)
+                    float diff = targetPatch[r, c] - current[r, c];
+                    if (Mathf.Abs(diff) > maxStep)
                     {
-                        current[r, c] += Mathf.Sign(diff) * maxHeightDeltaPerFrame;
+                        current[r, c] += Mathf.Sign(diff) * maxStep;
                         done = false;
                     }
                     else
                     {
-                        current[r, c] = target[r, c];
+                        current[r, c] = targetPatch[r, c];
                     }
                 }
             }
 
-            td.SetHeights(0, 0, current);
+            // Delay LOD/vegetation reconstruction until the patch has converged. This is the
+            // main performance win versus calling SetHeights on the entire map every frame.
+            td.SetHeightsDelayLOD(dirtyRect.xMin, dirtyRect.yMin, current);
 
             if (done) break;
-
-            // Yield every frame so height changes are gradual and physics can react.
             yield return null;
         }
 
-        // Apply coloring once heights have fully settled.
-        if (enableColoring)
-            ApplyColoring(td, normalizedMap, dataW, dataH);
-
+        FlushDelayedHeightmap(td);
         NotifyTerrainHeightmapReady();
+        _hasPendingHeightRect = false;
+        _pendingHeightRect = default;
         _smoothCoroutine = null;
     }
 
-    void ApplyColoring(TerrainData td, float[,] normalizedMap, int dataW, int dataH)
+    void ApplyColoring(
+        TerrainData td,
+        float[,] normalizedMap,
+        int dataW,
+        int dataH,
+        RectInt dirtyRect)
     {
         EnsureGradient();
 
-        if (useUnlitHeightMaterial && ApplyUnlitHeightColors(normalizedMap, dataW, dataH))
+        if (useUnlitHeightMaterial
+            && ApplyUnlitHeightColors(normalizedMap, dataW, dataH, dirtyRect))
             return;
 
         if (!_layersInitialized || rebuildTerrainLayersEveryUpdate)
@@ -416,15 +600,22 @@ public class HandleElevationMap : MonoBehaviour
             InitTerrainLayers(td);
             _layersInitialized = true;
         }
+        // TerrainLayer alphamaps do not share the data-grid resolution. Keep this fallback
+        // path full-frame; the default unlit path above performs true partial texture uploads.
         ApplyElevationColors(td, normalizedMap, dataW, dataH);
     }
 
-    bool ApplyUnlitHeightColors(float[,] normalizedMap, int dataW, int dataH)
+    bool ApplyUnlitHeightColors(
+        float[,] normalizedMap,
+        int dataW,
+        int dataH,
+        RectInt dirtyRect)
     {
         if (!EnsureUnlitHeightMaterial()) return false;
 
         int texW = Mathf.Max(2, dataW);
         int texH = Mathf.Max(2, dataH);
+        bool createdTexture = false;
         if (_unlitHeightTexture == null
             || _unlitHeightTexture.width != texW
             || _unlitHeightTexture.height != texH)
@@ -432,27 +623,42 @@ public class HandleElevationMap : MonoBehaviour
             if (_unlitHeightTexture != null)
                 Destroy(_unlitHeightTexture);
 
-            _unlitHeightTexture = new Texture2D(texW, texH, TextureFormat.RGBA32, true, false)
+            // Mipmaps add a full texture rebuild to every live update and are unnecessary
+            // for this small engineering color map.
+            _unlitHeightTexture = new Texture2D(texW, texH, TextureFormat.RGBA32, false, false)
             {
                 name = $"{name}_HeightColors",
                 wrapMode = TextureWrapMode.Clamp,
                 filterMode = FilterMode.Bilinear,
                 anisoLevel = 0
             };
+            createdTexture = true;
         }
 
-        var pixels = new Color[texW * texH];
-        for (int y = 0; y < texH; y++)
+        RectInt uploadRect = createdTexture
+            ? new RectInt(0, 0, texW, texH)
+            : ClampRectToSize(dirtyRect, texW, texH);
+        if (uploadRect.width <= 0 || uploadRect.height <= 0)
+            return true;
+
+        var pixels = new Color32[uploadRect.width * uploadRect.height];
+        for (int y = 0; y < uploadRect.height; y++)
         {
-            int sourceY = Mathf.Clamp(y, 0, dataH - 1);
-            for (int x = 0; x < texW; x++)
+            int sourceY = Mathf.Clamp(uploadRect.yMin + y, 0, dataH - 1);
+            for (int x = 0; x < uploadRect.width; x++)
             {
-                int sourceX = Mathf.Clamp(x, 0, dataW - 1);
-                pixels[y * texW + x] = elevationGradient.Evaluate(normalizedMap[sourceY, sourceX]);
+                int sourceX = Mathf.Clamp(uploadRect.xMin + x, 0, dataW - 1);
+                pixels[y * uploadRect.width + x] =
+                    elevationGradient.Evaluate(normalizedMap[sourceY, sourceX]);
             }
         }
-        _unlitHeightTexture.SetPixels(pixels);
-        _unlitHeightTexture.Apply(true, false);
+        _unlitHeightTexture.SetPixels32(
+            uploadRect.xMin,
+            uploadRect.yMin,
+            uploadRect.width,
+            uploadRect.height,
+            pixels);
+        _unlitHeightTexture.Apply(false, false);
 
         _unlitHeightMaterial.SetTexture("_HeightColorMap", _unlitHeightTexture);
         ApplyUnlitGridSettings(dataW, dataH);

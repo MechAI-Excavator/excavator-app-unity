@@ -165,6 +165,12 @@ public class TerrainTileManager : MonoBehaviour
             if (store != null && store.TryGet(key.x, key.y, out var cached) && cached != null)
                 ApplyToTerrain(t, cached);
         }
+
+        // Physics.IgnoreCollision is configured per active collider pair. Reapply it after
+        // pooled Terrain objects are enabled so the digging links do not receive contact
+        // impulses from the live TerrainCollider.
+        var excavator = FindFirstObjectByType<ExcavatorController>();
+        excavator?.RefreshArmTerrainCollisionPolicy();
     }
 
     /// <summary>
