@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -112,6 +113,12 @@ public class UILogic : MonoBehaviour
     Button _rightButton;
     Button _rearButton;
     Label _stateLabel;
+    Label _boomAngleLabel;
+    Label _stickAngleLabel;
+    Label _bucketAngleLabel;
+    bool _hasDisplayedJointAngles;
+    ExcavatorJointAngles _displayedJointAngles;
+    bool _loggedFirstJointAngleUpdate;
     VisualElement _settingsButton;
     VisualElement _settingsScrim;
     VisualElement _settingsDrawer;
@@ -122,19 +129,31 @@ public class UILogic : MonoBehaviour
     {
         BindTestControls();
         BindTelemetryLabels();
+        BindJointAngleLabels();
         BindSettingsDrawer();
         UpdateStateLabel();
+
+        ExcavatorJointStateStore.Changed += OnJointAnglesChanged;
+        if (ExcavatorJointStateStore.TryGetLatest(out var angles))
+            OnJointAnglesChanged(angles);
     }
 
     void OnDisable()
     {
+        ExcavatorJointStateStore.Changed -= OnJointAnglesChanged;
         UnbindSettingsDrawer();
         UnbindTestControls();
         _telemetryLabels.Clear();
+        _boomAngleLabel = null;
+        _stickAngleLabel = null;
+        _bucketAngleLabel = null;
+        _hasDisplayedJointAngles = false;
     }
 
     void Update()
     {
+        EnsureJointAngleLabels();
+        SyncLatestJointAngles();
         FlushTelemetryUpdates();
 
         if (!enableKeyboardMock)
@@ -246,6 +265,76 @@ public class UILogic : MonoBehaviour
             _rightButton.clicked += MockRightTurn;
         if (_rearButton != null)
             _rearButton.clicked += MockRearTurn;
+    }
+
+    void BindJointAngleLabels()
+    {
+        var document = GetComponent<UIDocument>();
+        if (document == null)
+            return;
+
+        var root = document.rootVisualElement;
+        _boomAngleLabel = root.Q<Label>("boom-angle-value");
+        _stickAngleLabel = root.Q<Label>("stick-angle-value");
+        _bucketAngleLabel = root.Q<Label>("bucket-angle-value");
+    }
+
+    void EnsureJointAngleLabels()
+    {
+        if (_boomAngleLabel?.panel != null
+            && _stickAngleLabel?.panel != null
+            && _bucketAngleLabel?.panel != null)
+        {
+            return;
+        }
+
+        BindJointAngleLabels();
+        if (ExcavatorJointStateStore.TryGetLatest(out var angles))
+            OnJointAnglesChanged(angles);
+    }
+
+    void OnJointAnglesChanged(ExcavatorJointAngles angles)
+    {
+        SetAngleText(_boomAngleLabel, angles.Boom);
+        SetAngleText(_stickAngleLabel, angles.Stick);
+        SetAngleText(_bucketAngleLabel, angles.Bucket);
+        _displayedJointAngles = angles;
+        _hasDisplayedJointAngles = true;
+
+        if (!_loggedFirstJointAngleUpdate)
+        {
+            _loggedFirstJointAngleUpdate = true;
+            Debug.Log(
+                $"[UI] 已更新首帧关节角度: boom={angles.Boom:F3} " +
+                $"stick={angles.Stick:F3} bucket={angles.Bucket:F3}; " +
+                $"labelsBound={_boomAngleLabel?.panel != null && _stickAngleLabel?.panel != null && _bucketAngleLabel?.panel != null}");
+        }
+    }
+
+    void SyncLatestJointAngles()
+    {
+        if (!ExcavatorJointStateStore.TryGetLatest(out var angles))
+            return;
+
+        if (_hasDisplayedJointAngles
+            && angles.Timestamp.Equals(_displayedJointAngles.Timestamp)
+            && Mathf.Approximately(angles.Boom, _displayedJointAngles.Boom)
+            && Mathf.Approximately(angles.Stick, _displayedJointAngles.Stick)
+            && Mathf.Approximately(angles.Bucket, _displayedJointAngles.Bucket))
+        {
+            return;
+        }
+
+        OnJointAnglesChanged(angles);
+    }
+
+    static void SetAngleText(Label label, float angle)
+    {
+        if (label == null)
+            return;
+
+        label.text =
+            angle.ToString("0.00", CultureInfo.InvariantCulture) + "°";
     }
 
     void UnbindTestControls()

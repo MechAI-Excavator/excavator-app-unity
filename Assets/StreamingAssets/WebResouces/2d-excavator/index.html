@@ -61,11 +61,6 @@
         display: block;
         user-select: none;
         -webkit-user-drag: none;
-        transition:
-          left 70ms linear,
-          top 70ms linear,
-          transform 70ms linear;
-        will-change: transform, left, top;
       }
 
       .base {
@@ -73,37 +68,6 @@
         top: 258px;
         width: 166px;
         height: 84px;
-      }
-
-      .angle-label {
-        position: absolute;
-        z-index: 10;
-        min-width: 150px;
-        font-size: 40px;
-        font-weight: 800;
-        line-height: 1;
-        letter-spacing: 0.02em;
-        text-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
-        white-space: nowrap;
-        pointer-events: none;
-        transform: translate(-50%, -50%);
-        transition:
-          left 70ms linear,
-          top 70ms linear;
-        will-change: transform, left, top;
-      }
-
-      .angle-label.boom,
-      .angle-label.stick {
-        color: var(--blue);
-      }
-
-      .angle-label.stick {
-        color: var(--blue-soft);
-      }
-
-      .angle-label.bucket {
-        color: var(--yellow);
       }
 
       .debug-panel {
@@ -146,10 +110,6 @@
         <img class="part boom" id="boom" src="./boom.png" alt="boom" />
         <img class="part stick" id="stick" src="./stick.png" alt="stick" />
         <img class="part bucket" id="bucket" src="./bucket.png" alt="bucket" />
-
-        <div class="angle-label boom" id="boomLabel">-70&deg;</div>
-        <div class="angle-label stick" id="stickLabel">180&deg;</div>
-        <div class="angle-label bucket" id="bucketLabel">60&deg;</div>
       </div>
     </main>
 
@@ -183,39 +143,33 @@
         };
 
         const ANGLE_LIMITS = {
-          boom: { min: -90, max: 0 },
+          boom: { min: -180, max: 180 },
           // The stick uses the +/-180 boundary as its center:
           // inward: 180 -> 0, outward: -180 -> 0.
           stick: { min: -180, max: 180, wrapsAt180: true },
-          bucket: { min: 0, max: 180 },
+          bucket: { min: -180, max: 180 },
         };
 
         const PARTS = {
           boom: {
             el: document.getElementById("boom"),
-            label: document.getElementById("boomLabel"),
             width: 334,
             height: 134,
             pivot: { x: 0, y: 133 },
             end: { x: 334, y: 0 },
-            labelOffset: { x: -106, y: -160 },
           },
           stick: {
             el: document.getElementById("stick"),
-            label: document.getElementById("stickLabel"),
             width: 54,
             height: 212,
             pivot: { x: 0, y: 33 },
             end: { x: 52, y: 212 },
-            labelOffset: { x: 92, y: -92 },
           },
           bucket: {
             el: document.getElementById("bucket"),
-            label: document.getElementById("bucketLabel"),
             width: 104,
             height: 96,
             pivot: { x: 84, y: 0 },
-            labelOffset: { x: -132, y: 52 },
           },
         };
 
@@ -302,12 +256,6 @@
           };
         }
 
-        function placeLabel(label, anchor, offset, value) {
-          label.style.left = `${anchor.x + offset.x}px`;
-          label.style.top = `${anchor.y + offset.y}px`;
-          label.textContent = `${Number(value).toFixed(2)}°`;
-        }
-
         function draw() {
           const boomDelta = -shortestAngleDelta(state.boom, DEFAULT_ANGLES.boom);
           const stickDelta = shortestAngleDelta(state.stick, DEFAULT_ANGLES.stick);
@@ -320,25 +268,6 @@
           const stickPivot = placePart(PARTS.boom, boomPivot, boomDelta);
           const bucketPivot = placePart(PARTS.stick, stickPivot, stickDelta);
           placePart(PARTS.bucket, bucketPivot, bucketDelta);
-
-          placeLabel(
-            PARTS.boom.label,
-            boomPivot,
-            PARTS.boom.labelOffset,
-            state.boom
-          );
-          placeLabel(
-            PARTS.stick.label,
-            stickPivot,
-            PARTS.stick.labelOffset,
-            state.stick
-          );
-          placeLabel(
-            PARTS.bucket.label,
-            bucketPivot,
-            PARTS.bucket.labelOffset,
-            state.bucket
-          );
         }
 
         function readAngle(data, keys, fallback) {

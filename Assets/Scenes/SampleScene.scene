@@ -1833,6 +1833,8 @@ MonoBehaviour:
   brokerHost: 127.0.0.1
   brokerPort: 1883
   clientId: 
+  autoReconnect: 1
+  reconnectDelaySeconds: 2
   username: pub
   password: 
   subscribeTopics:
@@ -1907,6 +1909,8 @@ MonoBehaviour:
   rebuildTerrainLayersEveryUpdate: 0
   useGlobalRangeForColoring: 1
   colorFromHeightmapRange: 1
+  skipUnchangedElevationFrames: 1
+  heightChangeEpsilon: 0.00001
   overlayGridTexture: 1
   gridTextureResolution: 64
   gridLineEveryPixels: 8
@@ -5230,7 +5234,7 @@ MonoBehaviour:
   activeRadius: 0
   terrainPrefab: {fileID: 4813701662413627476, guid: 23750bfce3377467992da5fb56f8d330,
     type: 3}
-  followTarget: {fileID: 217970466}
+  followTarget: {fileID: 0}
   store: {fileID: 0}
   edgeBlendSamples: 2
 --- !u!114 &1815460396
@@ -5646,6 +5650,8 @@ MonoBehaviour:
   layoutRefreshInterval: 0.15
   transparent: 1
   zoom: 0
+  armWebViewElementName: arm-webview
+  jointAnglePushInterval: 0.033333335
 --- !u!1 &1973221549 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8164078558771037576, guid: 1fdd0ed6a239246288e82977e7bc386e,

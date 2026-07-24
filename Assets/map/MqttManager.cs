@@ -12,6 +12,8 @@ using uPLibrary.Networking.M2Mqtt.Messages;
 /// </summary>
 public class MqttManager : MonoBehaviour
 {
+    private static readonly string[] JointsTopicAliases = { "01/joints", "joints" };
+
     [Header("Broker Settings")]
     [Tooltip("MQTT Broker 地址，例如 192.168.1.100 或 broker.hivemq.com")]
     public string brokerHost = "127.0.0.1";
@@ -21,6 +23,14 @@ public class MqttManager : MonoBehaviour
 
     [Tooltip("客户端 ID，留空则自动生成")]
     public string clientId = "";
+
+    [Header("Connection Reliability")]
+    [Tooltip("连接意外关闭或首次连接失败后自动重连")]
+    public bool autoReconnect = true;
+
+    [Min(0.5f)]
+    [Tooltip("自动重连间隔（秒）")]
+    public float reconnectDelaySeconds = 2f;
 
     [Header("Auth (Optional)")]
     public string username = "";
@@ -49,6 +59,11 @@ public class MqttManager : MonoBehaviour
     private readonly Queue<(string topic, string msg)> messageQueue = new();
     private readonly object queueLock = new();
     private ExcavatorController _excavatorController;
+    private bool _loggedFirstJointsMessage;
+    private bool _isConnecting;
+    private bool _isShuttingDown;
+    private volatile bool _connectionClosedPending;
+    private float _nextReconnectAt;
 
     void Start()
     {
@@ -58,6 +73,14 @@ public class MqttManager : MonoBehaviour
 
     void Update()
     {
+        if (_connectionClosedPending)
+        {
+            _connectionClosedPending = false;
+            Debug.LogWarning("[MQTT] 连接已关闭");
+            OnDisconnected?.Invoke();
+            ScheduleReconnect();
+        }
+
         // 在主线程中派发收到的消息（M2Mqtt 回调在子线程）
         lock (queueLock)
         {
@@ -68,10 +91,20 @@ public class MqttManager : MonoBehaviour
                 DispatchByTopic(topic, msg);
             }
         }
+
+        if (autoReconnect
+            && !_isShuttingDown
+            && !_isConnecting
+            && !IsConnected
+            && Time.unscaledTime >= _nextReconnectAt)
+        {
+            Connect();
+        }
     }
 
     void OnDestroy()
     {
+        _isShuttingDown = true;
         Disconnect();
     }
 
@@ -79,10 +112,20 @@ public class MqttManager : MonoBehaviour
 
     public void Connect()
     {
+        if (_isConnecting || IsConnected || _isShuttingDown)
+            return;
+
+        _isConnecting = true;
         try
         {
+            ReleaseClient(false);
+
+            string deviceId = SystemInfo.deviceUniqueIdentifier;
+            string shortDeviceId = string.IsNullOrEmpty(deviceId)
+                ? Guid.NewGuid().ToString("N")[..8]
+                : deviceId[..Math.Min(8, deviceId.Length)];
             string id = string.IsNullOrEmpty(clientId)
-                ? "unity-" + SystemInfo.deviceUniqueIdentifier[..8]
+                ? "unity-" + shortDeviceId
                 : clientId;
 
             client = new MqttClient(brokerHost, brokerPort, false, null, null,
@@ -100,25 +143,33 @@ public class MqttManager : MonoBehaviour
                 Debug.Log($"[MQTT] 已连接到 {brokerHost}:{brokerPort}");
                 SubscribeAll();
                 OnConnected?.Invoke();
+                _nextReconnectAt = 0f;
             }
             else
             {
                 Debug.LogError($"[MQTT] 连接被拒绝，返回码: {code}");
+                ReleaseClient(false);
+                ScheduleReconnect();
             }
         }
         catch (Exception e)
         {
             Debug.LogError($"[MQTT] 连接失败: {e.Message}");
+            ReleaseClient(false);
+            ScheduleReconnect();
+        }
+        finally
+        {
+            _isConnecting = false;
         }
     }
 
     public void Disconnect()
     {
-        if (client != null && client.IsConnected)
-        {
-            client.Disconnect();
+        bool wasConnected = IsConnected;
+        ReleaseClient(true);
+        if (wasConnected)
             Debug.Log("[MQTT] 已断开连接");
-        }
     }
 
     /// <summary>发布字符串消息</summary>
@@ -151,13 +202,28 @@ public class MqttManager : MonoBehaviour
 
     private void SubscribeAll()
     {
-        if (subscribeTopics == null || subscribeTopics.Length == 0) return;
-        var qosLevels = new byte[subscribeTopics.Length];
+        var topics = new List<string>();
+        if (subscribeTopics != null)
+        {
+            foreach (string topic in subscribeTopics)
+            {
+                if (!string.IsNullOrWhiteSpace(topic) && !topics.Contains(topic))
+                    topics.Add(topic);
+            }
+        }
+
+        foreach (string topic in JointsTopicAliases)
+        {
+            if (!topics.Contains(topic))
+                topics.Add(topic);
+        }
+
+        var qosLevels = new byte[topics.Count];
         for (int i = 0; i < qosLevels.Length; i++)
             qosLevels[i] = MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE;
 
-        client.Subscribe(subscribeTopics, qosLevels);
-        Debug.Log($"[MQTT] 已订阅 {subscribeTopics.Length} 个主题");
+        client.Subscribe(topics.ToArray(), qosLevels);
+        Debug.Log($"[MQTT] 已订阅 {topics.Count} 个主题: {string.Join(", ", topics)}");
     }
 
     private void OnMqttMessageReceived(object sender, MqttMsgPublishEventArgs e)
@@ -184,7 +250,8 @@ public class MqttManager : MonoBehaviour
                 HandleRtkLio(msg);
                 break;
             case "01/joints":
-                HandleJoints(msg);
+            case "joints":
+                HandleJoints(topic, msg);
                 break;
         }
     }
@@ -214,8 +281,40 @@ public class MqttManager : MonoBehaviour
 
     private void OnConnectionClosed(object sender, EventArgs e)
     {
-        Debug.LogWarning("[MQTT] 连接已关闭");
-        OnDisconnected?.Invoke();
+        // M2Mqtt 在后台线程回调；Unity 日志、事件和重连都交给主线程 Update。
+        _connectionClosedPending = true;
+    }
+
+    private void ScheduleReconnect()
+    {
+        if (!autoReconnect || _isShuttingDown)
+            return;
+
+        _nextReconnectAt =
+            Time.unscaledTime + Mathf.Max(0.5f, reconnectDelaySeconds);
+    }
+
+    private void ReleaseClient(bool disconnect)
+    {
+        var oldClient = client;
+        client = null;
+        if (oldClient == null)
+            return;
+
+        oldClient.MqttMsgPublishReceived -= OnMqttMessageReceived;
+        oldClient.ConnectionClosed -= OnConnectionClosed;
+
+        if (!disconnect || !oldClient.IsConnected)
+            return;
+
+        try
+        {
+            oldClient.Disconnect();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[MQTT] 断开连接时发生异常: {e.Message}");
+        }
     }
 
     private void HandleRtkLio(string msg)
@@ -245,7 +344,7 @@ public class MqttManager : MonoBehaviour
         }
     }
 
-    private void HandleJoints(string msg)
+    private void HandleJoints(string topic, string msg)
     {
         try
         {
@@ -254,8 +353,26 @@ public class MqttManager : MonoBehaviour
                 || data.joints.stick == null
                 || data.joints.bucket == null)
             {
-                Debug.LogWarning("[MQTT] 01/joints 解析失败，缺少 boom/stick/bucket 角度");
+                Debug.LogWarning(
+                    $"[MQTT] {topic} 解析失败，期望 joints.boom/stick/bucket.angle；" +
+                    $"payload={msg}");
                 return;
+            }
+
+            var angles = new ExcavatorJointAngles(
+                data.joints.boom.angle,
+                data.joints.stick.angle,
+                data.joints.bucket.angle,
+                data.timestamp);
+            ExcavatorJointStateStore.Publish(angles);
+
+            if (!_loggedFirstJointsMessage)
+            {
+                _loggedFirstJointsMessage = true;
+                Debug.Log(
+                    $"[MQTT] 已接收首帧关节数据 topic={topic} " +
+                    $"boom={angles.Boom:F3} stick={angles.Stick:F3} " +
+                    $"bucket={angles.Bucket:F3}");
             }
 
             if (_excavatorController == null)
@@ -267,13 +384,13 @@ public class MqttManager : MonoBehaviour
                 // them to the articulation drives lets Unity evaluate forward kinematics.
                 // Cabin and velocity are intentionally ignored for now.
                 _excavatorController.ApplyJointAngles(
-                    data.joints.boom.angle,
-                    data.joints.stick.angle,
-                    data.joints.bucket.angle);
+                    angles.Boom,
+                    angles.Stick,
+                    angles.Bucket);
             }
             else
             {
-                Debug.LogWarning("[MQTT] 场景中未找到 ExcavatorController，无法应用 01/joints");
+                Debug.LogWarning("[MQTT] 场景中未找到 ExcavatorController，无法将 01/joints 应用到 3D 模型");
             }
         }
         catch (Exception e)

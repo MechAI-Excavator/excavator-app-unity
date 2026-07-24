@@ -8,6 +8,8 @@ using UnityEngine.UIElements;
 [RequireComponent(typeof(UIDocument))]
 public sealed class AndroidWebViewOverlay : MonoBehaviour
 {
+    private const string DefaultArmWebViewElementName = "arm-webview";
+
     [Serializable]
     public sealed class WebViewPanel
     {
@@ -26,13 +28,21 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
     [SerializeField] private float layoutRefreshInterval = 0.15f;
     [SerializeField] private bool transparent = true;
     [SerializeField] private bool zoom = false;
+    [SerializeField] private string armWebViewElementName = "arm-webview";
+    [SerializeField, Min(0f)] private float jointAnglePushInterval = 1f / 30f;
 
     private readonly List<RuntimeWebView> _runtimeViews = new List<RuntimeWebView>();
     private UIDocument _document;
     private Type _webViewObjectType;
     private float _nextLayoutRefresh;
+    private float _nextJointAnglePush;
     private bool _warnedMissingPlugin;
     private bool _globalVisible = true;
+    private bool _jointAnglesDirty;
+    private bool _loggedFirstJointAnglePush;
+    private bool _hasObservedJointAngles;
+    private ExcavatorJointAngles _observedJointAngles;
+    private ExcavatorJointAngles _pendingJointAngles;
 
     private sealed class RuntimeWebView
     {
@@ -40,6 +50,15 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
         public VisualElement element;
         public Component webView;
         public RectInt lastRect;
+        public bool isLoaded;
+    }
+
+    [Serializable]
+    private struct JointAnglesWebPayload
+    {
+        public float boom;
+        public float stick;
+        public float bucket;
     }
 
     private void Awake()
@@ -51,20 +70,32 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
     private void OnEnable()
     {
         EnsureDefaultPanels();
+        ExcavatorJointStateStore.Changed += OnJointAnglesChanged;
+        if (ExcavatorJointStateStore.TryGetLatest(out var angles))
+            OnJointAnglesChanged(angles);
+
         Invoke(nameof(CreateWebViews), 0.1f);
     }
 
     private void Update()
     {
-        if (Time.unscaledTime < _nextLayoutRefresh) return;
-        _nextLayoutRefresh = Time.unscaledTime + Mathf.Max(0.03f, layoutRefreshInterval);
+        if (Time.unscaledTime >= _nextLayoutRefresh)
+        {
+            _nextLayoutRefresh = Time.unscaledTime + Mathf.Max(0.03f, layoutRefreshInterval);
 
-        CreateWebViews();
-        RefreshWebViewLayouts();
+            CreateWebViews();
+            RefreshWebViewLayouts();
+        }
+
+        SyncLatestJointAngles();
+        PushPendingJointAngles();
     }
 
     private void OnDisable()
     {
+        CancelInvoke(nameof(CreateWebViews));
+        ExcavatorJointStateStore.Changed -= OnJointAnglesChanged;
+        _hasObservedJointAngles = false;
         DestroyWebViews();
     }
 
@@ -114,29 +145,39 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
             if (!TryGetScreenRect(element, out var rect))
                 continue;
 
+            RuntimeWebView runtimeView = null;
             try
             {
                 var webViewObject = new GameObject($"WebViewOverlay-{panel.elementName}");
                 webViewObject.transform.SetParent(transform, false);
                 var webView = webViewObject.AddComponent(_webViewObjectType);
 
-                InitWebView(webView);
-                SetMargins(webView, rect);
-                SetVisibility(webView, panel.visible && _globalVisible);
-                string url = BuildLocalUrl(panel.htmlPath);
-                LoadUrl(webView, url);
-                Debug.Log($"[WebViewOverlay] Created '{panel.elementName}' rect={rect} url={url}");
-
-                _runtimeViews.Add(new RuntimeWebView
+                runtimeView = new RuntimeWebView
                 {
                     panel = panel,
                     element = element,
                     webView = webView,
                     lastRect = rect
-                });
+                };
+
+                InitWebView(webView, () => OnWebViewLoaded(runtimeView));
+                SetMargins(webView, rect);
+                SetVisibility(webView, panel.visible && _globalVisible);
+                _runtimeViews.Add(runtimeView);
+
+                string url = BuildLocalUrl(panel.htmlPath);
+                LoadUrl(webView, url);
+                Debug.Log($"[WebViewOverlay] Created '{panel.elementName}' rect={rect} url={url}");
             }
             catch (Exception ex)
             {
+                if (runtimeView != null)
+                {
+                    _runtimeViews.Remove(runtimeView);
+                    if (runtimeView.webView != null)
+                        Destroy(runtimeView.webView.gameObject);
+                }
+
                 Debug.LogError($"[WebViewOverlay] Failed to create '{panel.elementName}' for '{panel.htmlPath}': {ex}");
             }
         }
@@ -201,7 +242,7 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
         return width > 0 && height > 0;
     }
 
-    private void InitWebView(Component webView)
+    private void InitWebView(Component webView, Action onLoaded)
     {
         var method = _webViewObjectType.GetMethod("Init");
         if (method == null) return;
@@ -214,6 +255,9 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
 
             switch (parameters[i].Name)
             {
+                case "cb":
+                    args[i] = new Action<string>(OnWebViewMessage);
+                    break;
                 case "err":
                     args[i] = new Action<string>((message) => Debug.LogError($"[WebViewOverlay] WebView error: {message}"));
                     break;
@@ -221,7 +265,11 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
                     args[i] = new Action<string>((message) => Debug.LogError($"[WebViewOverlay] WebView HTTP error: {message}"));
                     break;
                 case "ld":
-                    args[i] = new Action<string>((message) => Debug.Log($"[WebViewOverlay] WebView loaded: {message}"));
+                    args[i] = new Action<string>((message) =>
+                    {
+                        Debug.Log($"[WebViewOverlay] WebView loaded: {message}");
+                        onLoaded?.Invoke();
+                    });
                     break;
                 case "started":
                     args[i] = new Action<string>((message) => Debug.Log($"[WebViewOverlay] WebView started: {message}"));
@@ -242,6 +290,163 @@ public sealed class AndroidWebViewOverlay : MonoBehaviour
         }
 
         method.Invoke(webView, args);
+    }
+
+    private void OnJointAnglesChanged(ExcavatorJointAngles angles)
+    {
+        _observedJointAngles = angles;
+        _hasObservedJointAngles = true;
+        _pendingJointAngles = angles;
+        _jointAnglesDirty = true;
+    }
+
+    private void SyncLatestJointAngles()
+    {
+        if (!ExcavatorJointStateStore.TryGetLatest(out var angles))
+            return;
+
+        if (_hasObservedJointAngles
+            && angles.Timestamp.Equals(_observedJointAngles.Timestamp)
+            && Mathf.Approximately(angles.Boom, _observedJointAngles.Boom)
+            && Mathf.Approximately(angles.Stick, _observedJointAngles.Stick)
+            && Mathf.Approximately(angles.Bucket, _observedJointAngles.Bucket))
+        {
+            return;
+        }
+
+        OnJointAnglesChanged(angles);
+    }
+
+    private void OnWebViewLoaded(RuntimeWebView view)
+    {
+        view.isLoaded = true;
+        if (view.panel != null
+            && IsArmWebView(view.panel)
+            && ExcavatorJointStateStore.TryGetLatest(out var angles))
+        {
+            OnJointAnglesChanged(angles);
+        }
+    }
+
+    private void PushPendingJointAngles()
+    {
+        if (!_jointAnglesDirty || Time.unscaledTime < _nextJointAnglePush)
+            return;
+
+        var payload = new JointAnglesWebPayload
+        {
+            boom = _pendingJointAngles.Boom,
+            stick = _pendingJointAngles.Stick,
+            bucket = _pendingJointAngles.Bucket
+        };
+        string json = JsonUtility.ToJson(payload);
+        string script =
+            "(function() { try {" +
+            $"var payload = {json};" +
+            "if (typeof window.applyExcavatorPayload !== 'function') {" +
+            "console.error('[ExcavatorView] applyExcavatorPayload is unavailable');" +
+            "return;" +
+            "}" +
+            "window.applyExcavatorPayload(payload);" +
+            "window.__excavatorAngleAckCount = (window.__excavatorAngleAckCount || 0) + 1;" +
+            "var ackNow = Date.now();" +
+            "var shouldAck = window.__excavatorAngleAckCount <= 3 || " +
+            "!window.__excavatorAngleLastAckAt || ackNow - window.__excavatorAngleLastAckAt >= 1000;" +
+            "if (shouldAck && window.Unity && typeof window.Unity.call === 'function') {" +
+            "window.__excavatorAngleLastAckAt = ackNow;" +
+            "var boom = document.getElementById('boom');" +
+            "var stick = document.getElementById('stick');" +
+            "var bucket = document.getElementById('bucket');" +
+            "var boomRect = boom ? boom.getBoundingClientRect() : null;" +
+            "window.Unity.call('excavator-angles-applied|' + JSON.stringify({" +
+            "seq: window.__excavatorAngleAckCount," +
+            "input: payload," +
+            "boomTransform: boom ? boom.style.transform : null," +
+            "stickTransform: stick ? stick.style.transform : null," +
+            "bucketTransform: bucket ? bucket.style.transform : null," +
+            "computedBoomTransform: boom ? getComputedStyle(boom).transform : null," +
+            "boomRect: boomRect ? {x: boomRect.x, y: boomRect.y, width: boomRect.width, height: boomRect.height} : null" +
+            "}));" +
+            "}" +
+            "} catch (error) {" +
+            "console.error('[ExcavatorView] failed to apply angles', error);" +
+            "} })();";
+        bool pushed = false;
+        bool attempted = false;
+
+        foreach (var view in _runtimeViews)
+        {
+            if (view.webView == null
+                || !view.isLoaded
+                || view.panel == null
+                || !IsArmWebView(view.panel))
+            {
+                continue;
+            }
+
+            attempted = true;
+            pushed |= TryEvaluateJavaScript(view.webView, script);
+        }
+
+        if (attempted)
+        {
+            _nextJointAnglePush =
+                Time.unscaledTime + Mathf.Max(0f, jointAnglePushInterval);
+        }
+
+        if (!pushed)
+            return;
+
+        if (!_loggedFirstJointAnglePush)
+        {
+            _loggedFirstJointAnglePush = true;
+            Debug.Log(
+                $"[WebViewOverlay] 已向 '{DefaultArmWebViewElementName}' 推送首帧关节角度: " +
+                $"boom={payload.boom:F3} stick={payload.stick:F3} " +
+                $"bucket={payload.bucket:F3}");
+        }
+
+        _jointAnglesDirty = false;
+    }
+
+    private void OnWebViewMessage(string message)
+    {
+        const string appliedPrefix = "excavator-angles-applied|";
+        if (message != null && message.StartsWith(appliedPrefix, StringComparison.Ordinal))
+        {
+            Debug.Log(
+                "[WebViewOverlay] WebView 已实际应用关节角度: " +
+                message.Substring(appliedPrefix.Length));
+            return;
+        }
+
+        Debug.Log($"[WebViewOverlay] WebView message: {message}");
+    }
+
+    private bool IsArmWebView(WebViewPanel panel)
+    {
+        string elementName = string.IsNullOrWhiteSpace(armWebViewElementName)
+            ? DefaultArmWebViewElementName
+            : armWebViewElementName;
+        return panel.elementName == elementName;
+    }
+
+    private bool TryEvaluateJavaScript(Component webView, string script)
+    {
+        try
+        {
+            var method = _webViewObjectType.GetMethod("EvaluateJS");
+            if (method == null)
+                return false;
+
+            method.Invoke(webView, new object[] { script });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[WebViewOverlay] Failed to update excavator angles: {ex}");
+            return false;
+        }
     }
 
     private void SetMargins(Component webView, RectInt rect)

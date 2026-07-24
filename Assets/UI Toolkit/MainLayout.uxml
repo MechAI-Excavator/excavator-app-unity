@@ -45,15 +45,15 @@
                 <ui:VisualElement class="arm-readouts">
                     <ui:VisualElement class="arm-row">
                         <ui:Label text="BOOM" class="arm-key" />
-                        <ui:Label text="38.5°" class="arm-value" />
+                        <ui:Label name="boom-angle-value" text="--" class="arm-value" />
                     </ui:VisualElement>
                     <ui:VisualElement class="arm-row">
                         <ui:Label text="ARM" class="arm-key" />
-                        <ui:Label text="72.0°" class="arm-value" />
+                        <ui:Label name="stick-angle-value" text="--" class="arm-value" />
                     </ui:VisualElement>
                     <ui:VisualElement class="arm-row">
                         <ui:Label text="BUCKET" class="arm-key" />
-                        <ui:Label text="-18.4°" class="arm-value" />
+                        <ui:Label name="bucket-angle-value" text="--" class="arm-value" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>

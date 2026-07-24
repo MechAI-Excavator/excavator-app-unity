@@ -987,7 +987,7 @@ TemplateContainer {
     position: absolute;
     left: 0;
     top: 0;
-    right: 0;
+    right: -150;
     height: 150px;
     background-color: rgba(0, 0, 0, 0);
 }
