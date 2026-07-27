@@ -21,18 +21,23 @@
 
             <ui:VisualElement name="indicator-stack" class="indicator-stack">
                 <ui:VisualElement name="direction-indicator" class="indicator direction-indicator">
+
                     <ui:VisualElement class="indicator-image indicator-outer" />
-                    <ui:VisualElement class="indicator-image indicator-horizontal" />
-                    <ui:VisualElement class="indicator-image indicator-forward" />
+                    <!-- <ui:VisualElement class="indicator-image indicator-horizontal" /> -->
+                    <ui:VisualElement name="indicator-forward-rotator" class="indicator-forward-rotator">
+                        <ui:VisualElement class="indicator-image indicator-forward" />
+                    </ui:VisualElement>
                     <ui:VisualElement class="indicator-image navigation-arrow" />
                 </ui:VisualElement>
 
                 <ui:VisualElement name="heading-indicator" class="indicator heading-indicator">
+
                     <ui:VisualElement class="indicator-image heading-outer" />
                     <ui:VisualElement class="indicator-image heading-inner" />
                 </ui:VisualElement>
 
                 <ui:VisualElement name="pitch-indicator" class="indicator pitch-indicator">
+
                     <ui:VisualElement class="indicator-image pitch-image" />
                     <ui:VisualElement class="pitch-level-bar" />
                 </ui:VisualElement>

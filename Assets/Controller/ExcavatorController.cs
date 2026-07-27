@@ -37,12 +37,23 @@ public class ExcavatorController : MonoBehaviour
     public float forceLimit = 99999999f;
 
     [Header("01/joints 正运动学")]
-    [Tooltip("收到 01/joints 后，用相对父关节角度驱动 boom/stick/bucket。cabin 暂不由该 topic 控制。")]
+    [Tooltip("收到 01/joints 后，用相对父关节角度驱动 boom/stick/bucket，并可用 rotate 控制整机全局朝向。cabin 暂不由该 topic 控制。")]
     public bool jointsTopicControlEnabled = true;
 
     public JointAngleCalibration boomJointCalibration = new();
     public JointAngleCalibration stickJointCalibration = new();
     public JointAngleCalibration bucketJointCalibration = new();
+
+    [Header("01/joints 整机朝向")]
+    [Tooltip("使用 joints.rotate.angle 驱动整台挖掘机的世界 Y 轴朝向，而不是 cabin 局部关节。")]
+    public bool jointsRotateControlEnabled = true;
+
+    [Tooltip("输入约定：0°=北(+Z)，90°=东(+X)，顺时针为正。模型朝向或正负方向不一致时调整 scale/offsetDegrees。")]
+    public JointAngleCalibration rotateHeadingCalibration = new();
+
+    [Min(0f)]
+    [Tooltip("rotate 收到后覆盖 RTK 朝向的时长（秒）。持续以 5Hz 接收时 rotate 始终优先；设为 0 表示永久优先。")]
+    public float jointsRotateRtkOverrideSeconds = 1f;
 
     [Tooltip("每隔一段时间打印 MQTT 原始角度、映射目标和关节实际角度。仅用于现场诊断。")]
     public bool logJointsDebug = false;
@@ -128,6 +139,8 @@ public class ExcavatorController : MonoBehaviour
     private bool _rotationTargetReady;
     private bool _initialPositionTeleportPending;
     private Quaternion _uprightBaseRotation;
+    private bool _jointsHeadingTargetReady;
+    private float _lastJointsHeadingTime;
 
     // 挖掘机的根 ArticulationBody（base link），
     // 位姿通过 TeleportRoot 设置
@@ -322,6 +335,34 @@ public class ExcavatorController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Applies the whole machine's absolute map heading. Unity's +Z is north and +X is east,
+    /// so a positive Y Euler angle already matches the input convention (clockwise from above:
+    /// 0° north, 90° east). The existing base-pose smoothing takes the shortest path across
+    /// the 0°/360° boundary.
+    /// </summary>
+    public void ApplyGlobalHeading(float headingDegrees)
+    {
+        if (!jointsRotateControlEnabled)
+            return;
+
+        if (!IsFinite(headingDegrees))
+        {
+            Debug.LogWarning("[Excavator] 忽略包含 NaN/Infinity 的 joints.rotate.angle");
+            return;
+        }
+
+        float unityHeading = CalibrateJointAngle(
+            rotateHeadingCalibration,
+            headingDegrees);
+        unityHeading = Mathf.Repeat(unityHeading, 360f);
+
+        _targetBaseRotation = Quaternion.Euler(0f, unityHeading, 0f);
+        _rotationTargetReady = true;
+        _jointsHeadingTargetReady = true;
+        _lastJointsHeadingTime = Time.unscaledTime;
+    }
+
     // ── RTK 位姿 API ────────────────────────────────────────
 
     /// <summary>
@@ -342,7 +383,7 @@ public class ExcavatorController : MonoBehaviour
             _positionTargetReady = true;
         }
 
-        if (rotation != null)
+        if (rotation != null && !JointsHeadingOverridesRtk())
         {
             var enu = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
             _targetBaseRotation = EnuToUnity(enu);
@@ -355,11 +396,20 @@ public class ExcavatorController : MonoBehaviour
     /// </summary>
     public void ApplyRtkRotation(RtkRotation rotation)
     {
-        if (rotation == null) return;
+        if (rotation == null || JointsHeadingOverridesRtk()) return;
 
         var enu = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
         _targetBaseRotation = EnuToUnity(enu);
         _rotationTargetReady = true;
+    }
+
+    private bool JointsHeadingOverridesRtk()
+    {
+        if (!jointsRotateControlEnabled || !_jointsHeadingTargetReady)
+            return false;
+
+        return jointsRotateRtkOverrideSeconds <= 0f
+            || Time.unscaledTime - _lastJointsHeadingTime <= jointsRotateRtkOverrideSeconds;
     }
 
     /// <summary>

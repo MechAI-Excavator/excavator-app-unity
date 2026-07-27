@@ -9,17 +9,23 @@ public readonly struct ExcavatorJointAngles
     public float Boom { get; }
     public float Stick { get; }
     public float Bucket { get; }
+    public float Rotate { get; }
+    public bool HasRotate { get; }
     public double Timestamp { get; }
 
     public ExcavatorJointAngles(
         float boom,
         float stick,
         float bucket,
+        float rotate,
+        bool hasRotate,
         double timestamp)
     {
         Boom = boom;
         Stick = stick;
         Bucket = bucket;
+        Rotate = rotate;
+        HasRotate = hasRotate;
         Timestamp = timestamp;
     }
 }

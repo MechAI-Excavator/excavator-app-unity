@@ -92,6 +92,15 @@ public class UILogic : MonoBehaviour
     [Header("开发调试")]
     [SerializeField] bool enableKeyboardMock;
 
+    [SerializeField, Range(0f, 359f)]
+    [Tooltip("运行时调试方位；仅在 Enable Keyboard Mock 开启时响应 Inspector 修改。")]
+    float mockDirectionHeading;
+
+    [Header("方位指示")]
+    [SerializeField, Min(0f)]
+    [Tooltip("方位 UI 的平滑跟随速度。设为 0 时立即指向最新角度。")]
+    float directionIndicatorLerpSpeed = 8f;
+
     public VehicleMotionState CurrentState { get; private set; } = VehicleMotionState.Idle;
 
     public event Action<VehicleMotionState> VehicleMotionStateChanged;
@@ -116,9 +125,15 @@ public class UILogic : MonoBehaviour
     Label _boomAngleLabel;
     Label _stickAngleLabel;
     Label _bucketAngleLabel;
+    VisualElement _navigationArrow;
+    VisualElement _indicatorForwardRotator;
     bool _hasDisplayedJointAngles;
     ExcavatorJointAngles _displayedJointAngles;
     bool _loggedFirstJointAngleUpdate;
+    bool _loggedDirectionIndicatorBinding;
+    bool _directionHeadingReady;
+    float _targetDirectionHeading;
+    float _displayedDirectionHeading;
     VisualElement _settingsButton;
     VisualElement _settingsScrim;
     VisualElement _settingsDrawer;
@@ -130,6 +145,7 @@ public class UILogic : MonoBehaviour
         BindTestControls();
         BindTelemetryLabels();
         BindJointAngleLabels();
+        BindDirectionIndicators();
         BindSettingsDrawer();
         UpdateStateLabel();
 
@@ -147,13 +163,20 @@ public class UILogic : MonoBehaviour
         _boomAngleLabel = null;
         _stickAngleLabel = null;
         _bucketAngleLabel = null;
+        _navigationArrow = null;
+        _indicatorForwardRotator = null;
         _hasDisplayedJointAngles = false;
+        _directionHeadingReady = false;
     }
 
     void Update()
     {
         EnsureJointAngleLabels();
+        EnsureDirectionIndicators();
         SyncLatestJointAngles();
+        if (enableKeyboardMock)
+            SetDirectionHeading(mockDirectionHeading);
+        UpdateDirectionIndicators();
         FlushTelemetryUpdates();
 
         if (!enableKeyboardMock)
@@ -169,6 +192,16 @@ public class UILogic : MonoBehaviour
             MockRearTurn();
         else if (Input.GetKeyDown(KeyCode.Alpha4))
             MockForward();
+        else if (Input.GetKeyDown(KeyCode.Alpha5))
+            SetMockDirectionHeading(0f);
+        else if (Input.GetKeyDown(KeyCode.Alpha6))
+            SetMockDirectionHeading(90f);
+        else if (Input.GetKeyDown(KeyCode.Alpha7))
+            SetMockDirectionHeading(180f);
+        else if (Input.GetKeyDown(KeyCode.Alpha8))
+            SetMockDirectionHeading(270f);
+        else if (Input.GetKeyDown(KeyCode.Alpha9))
+            SetMockDirectionHeading(359f);
     }
 
     /// <summary>
@@ -241,6 +274,36 @@ public class UILogic : MonoBehaviour
         SetVehicleMotionState(VehicleMotionState.RearTurn);
     }
 
+    [ContextMenu("方位 Mock/北 0°")]
+    void MockHeadingNorth()
+    {
+        SetMockDirectionHeading(0f);
+    }
+
+    [ContextMenu("方位 Mock/东 90°")]
+    void MockHeadingEast()
+    {
+        SetMockDirectionHeading(90f);
+    }
+
+    [ContextMenu("方位 Mock/南 180°")]
+    void MockHeadingSouth()
+    {
+        SetMockDirectionHeading(180f);
+    }
+
+    [ContextMenu("方位 Mock/西 270°")]
+    void MockHeadingWest()
+    {
+        SetMockDirectionHeading(270f);
+    }
+
+    [ContextMenu("方位 Mock/跨北 359°")]
+    void MockHeadingNorthWrap()
+    {
+        SetMockDirectionHeading(359f);
+    }
+
     void BindTestControls()
     {
         var document = GetComponent<UIDocument>();
@@ -279,6 +342,17 @@ public class UILogic : MonoBehaviour
         _bucketAngleLabel = root.Q<Label>("bucket-angle-value");
     }
 
+    void BindDirectionIndicators()
+    {
+        var document = GetComponent<UIDocument>();
+        if (document == null)
+            return;
+
+        var root = document.rootVisualElement;
+        _navigationArrow = root.Q<VisualElement>(className: "navigation-arrow");
+        _indicatorForwardRotator = root.Q<VisualElement>("indicator-forward-rotator");
+    }
+
     void EnsureJointAngleLabels()
     {
         if (_boomAngleLabel?.panel != null
@@ -293,11 +367,26 @@ public class UILogic : MonoBehaviour
             OnJointAnglesChanged(angles);
     }
 
+    void EnsureDirectionIndicators()
+    {
+        if (_navigationArrow?.panel != null
+            && _indicatorForwardRotator?.panel != null)
+        {
+            return;
+        }
+
+        BindDirectionIndicators();
+        if (_directionHeadingReady)
+            ApplyDirectionIndicatorRotation(_displayedDirectionHeading);
+    }
+
     void OnJointAnglesChanged(ExcavatorJointAngles angles)
     {
         SetAngleText(_boomAngleLabel, angles.Boom);
         SetAngleText(_stickAngleLabel, angles.Stick);
         SetAngleText(_bucketAngleLabel, angles.Bucket);
+        if (angles.HasRotate)
+            SetDirectionHeading(angles.Rotate);
         _displayedJointAngles = angles;
         _hasDisplayedJointAngles = true;
 
@@ -320,12 +409,78 @@ public class UILogic : MonoBehaviour
             && angles.Timestamp.Equals(_displayedJointAngles.Timestamp)
             && Mathf.Approximately(angles.Boom, _displayedJointAngles.Boom)
             && Mathf.Approximately(angles.Stick, _displayedJointAngles.Stick)
-            && Mathf.Approximately(angles.Bucket, _displayedJointAngles.Bucket))
+            && Mathf.Approximately(angles.Bucket, _displayedJointAngles.Bucket)
+            && angles.HasRotate == _displayedJointAngles.HasRotate
+            && (!angles.HasRotate
+                || Mathf.Approximately(angles.Rotate, _displayedJointAngles.Rotate)))
         {
             return;
         }
 
         OnJointAnglesChanged(angles);
+    }
+
+    /// <summary>
+    /// Updates both direction visuals from the absolute map heading:
+    /// 0°=north/up, 90°=east/right, clockwise positive.
+    /// </summary>
+    public void SetDirectionHeading(float headingDegrees)
+    {
+        if (float.IsNaN(headingDegrees) || float.IsInfinity(headingDegrees))
+            return;
+
+        _targetDirectionHeading = Mathf.Repeat(headingDegrees, 360f);
+        if (!_loggedDirectionIndicatorBinding)
+        {
+            _loggedDirectionIndicatorBinding = true;
+            Debug.Log(
+                $"[UI] 方位指示绑定: navigationArrow={_navigationArrow != null}, " +
+                $"indicatorForwardRotator={_indicatorForwardRotator != null}");
+        }
+
+        if (_directionHeadingReady)
+            return;
+
+        _displayedDirectionHeading = _targetDirectionHeading;
+        _directionHeadingReady = true;
+        ApplyDirectionIndicatorRotation(_displayedDirectionHeading);
+    }
+
+    void SetMockDirectionHeading(float headingDegrees)
+    {
+        mockDirectionHeading = Mathf.Repeat(headingDegrees, 360f);
+        SetDirectionHeading(mockDirectionHeading);
+    }
+
+    void UpdateDirectionIndicators()
+    {
+        if (!_directionHeadingReady)
+            return;
+
+        if (directionIndicatorLerpSpeed <= 0f)
+        {
+            _displayedDirectionHeading = _targetDirectionHeading;
+        }
+        else
+        {
+            float interpolation = 1f
+                - Mathf.Exp(-directionIndicatorLerpSpeed * Time.unscaledDeltaTime);
+            _displayedDirectionHeading = Mathf.LerpAngle(
+                _displayedDirectionHeading,
+                _targetDirectionHeading,
+                interpolation);
+        }
+
+        ApplyDirectionIndicatorRotation(_displayedDirectionHeading);
+    }
+
+    void ApplyDirectionIndicatorRotation(float headingDegrees)
+    {
+        var rotation = new Rotate(new Angle(headingDegrees, AngleUnit.Degree));
+        if (_navigationArrow != null)
+            _navigationArrow.style.rotate = rotation;
+        if (_indicatorForwardRotator != null)
+            _indicatorForwardRotator.style.rotate = rotation;
     }
 
     static void SetAngleText(Label label, float angle)

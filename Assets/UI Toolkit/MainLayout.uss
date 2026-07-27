@@ -908,6 +908,15 @@ TemplateContainer {
     background-image: resource("direction_horizontal_indication");
 }
 
+.indicator-forward-rotator {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 260px;
+    height: 260px;
+    transform-origin: 50% 50%;
+}
+
 .indicator-forward {
     left: 58px;
     top: 22px;
@@ -922,6 +931,7 @@ TemplateContainer {
     width: 42px;
     height: 42px;
     background-image: resource("navigationArrow");
+    transform-origin: 50% 50%;
 }
 
 .heading-indicator {

@@ -363,6 +363,8 @@ public class MqttManager : MonoBehaviour
                 data.joints.boom.angle,
                 data.joints.stick.angle,
                 data.joints.bucket.angle,
+                data.joints.rotate != null ? data.joints.rotate.angle : 0f,
+                data.joints.rotate != null,
                 data.timestamp);
             ExcavatorJointStateStore.Publish(angles);
 
@@ -372,7 +374,8 @@ public class MqttManager : MonoBehaviour
                 Debug.Log(
                     $"[MQTT] 已接收首帧关节数据 topic={topic} " +
                     $"boom={angles.Boom:F3} stick={angles.Stick:F3} " +
-                    $"bucket={angles.Bucket:F3}");
+                    $"bucket={angles.Bucket:F3}" +
+                    (angles.HasRotate ? $" rotate={angles.Rotate:F3}" : " rotate=<missing>"));
             }
 
             if (_excavatorController == null)
@@ -387,6 +390,11 @@ public class MqttManager : MonoBehaviour
                     angles.Boom,
                     angles.Stick,
                     angles.Bucket);
+
+                // rotate is the whole machine's absolute map heading:
+                // 0°=north(+Z), 90°=east(+X), clockwise positive.
+                if (angles.HasRotate)
+                    _excavatorController.ApplyGlobalHeading(angles.Rotate);
             }
             else
             {
@@ -488,6 +496,7 @@ public class JointKinematicsPayload
     public JointKinematicsState stick;
     public JointKinematicsState boom;
     public JointKinematicsState cabin;
+    public JointKinematicsState rotate;
 }
 
 [Serializable]

@@ -1374,6 +1374,11 @@ MonoBehaviour:
   bucketJointCalibration:
     scale: 1
     offsetDegrees: -140
+  jointsRotateControlEnabled: 1
+  rotateHeadingCalibration:
+    scale: 1
+    offsetDegrees: 0
+  jointsRotateRtkOverrideSeconds: 1
   logJointsDebug: 0
   jointsDebugLogInterval: 1
   worldScale: 1
@@ -5614,6 +5619,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   enableKeyboardMock: 0
+  mockDirectionHeading: 0
+  directionIndicatorLerpSpeed: 8
 --- !u!114 &1967017552
 MonoBehaviour:
   m_ObjectHideFlags: 0
