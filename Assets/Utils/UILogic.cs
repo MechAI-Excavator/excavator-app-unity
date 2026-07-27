@@ -140,6 +140,17 @@ public class UILogic : MonoBehaviour
     AndroidWebViewOverlay _webViewOverlay;
     readonly List<VisualElement> _settingsMenuItems = new List<VisualElement>();
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void EnsureRuntimeInstanceEnabled()
+    {
+        var uiLogic = FindFirstObjectByType<UILogic>(FindObjectsInactive.Include);
+        if (uiLogic == null || uiLogic.enabled)
+            return;
+
+        uiLogic.enabled = true;
+        Debug.LogWarning("[UI] UILogic 在场景加载时处于禁用状态，已自动启用方位与遥测更新。");
+    }
+
     void OnEnable()
     {
         BindTestControls();
