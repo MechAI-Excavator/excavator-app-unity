@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [System.Serializable]
 public class JointAngleCalibration
@@ -37,23 +38,21 @@ public class ExcavatorController : MonoBehaviour
     public float forceLimit = 99999999f;
 
     [Header("01/joints 正运动学")]
-    [Tooltip("收到 01/joints 后，用相对父关节角度驱动 boom/stick/bucket，并可用 rotate 控制整机全局朝向。cabin 暂不由该 topic 控制。")]
+    [Tooltip("收到 01/joints 后，用相对父关节角度驱动 boom/stick/bucket。cabin 与整机朝向不由该 topic 控制。")]
     public bool jointsTopicControlEnabled = true;
 
     public JointAngleCalibration boomJointCalibration = new();
     public JointAngleCalibration stickJointCalibration = new();
     public JointAngleCalibration bucketJointCalibration = new();
 
-    [Header("01/joints 整机朝向")]
-    [Tooltip("使用 joints.rotate.angle 驱动整台挖掘机的世界 Y 轴朝向，而不是 cabin 局部关节。")]
-    public bool jointsRotateControlEnabled = true;
+    [Header("01/map/elevation 整机朝向")]
+    [FormerlySerializedAs("jointsRotateControlEnabled")]
+    [Tooltip("使用 metadata.origin.yaw 驱动整台挖掘机的世界 Y 轴朝向，而不是 cabin 局部关节。")]
+    public bool elevationYawControlEnabled = true;
 
-    [Tooltip("输入约定：0°=北(+Z)，90°=东(+X)，顺时针为正。模型朝向或正负方向不一致时调整 scale/offsetDegrees。")]
-    public JointAngleCalibration rotateHeadingCalibration = new();
-
-    [Min(0f)]
-    [Tooltip("rotate 收到后覆盖 RTK 朝向的时长（秒）。持续以 5Hz 接收时 rotate 始终优先；设为 0 表示永久优先。")]
-    public float jointsRotateRtkOverrideSeconds = 1f;
+    [FormerlySerializedAs("rotateHeadingCalibration")]
+    [Tooltip("yaw 会先从 ENU 弧度转换为罗盘角（北=0°、东=90°、顺时针为正），模型方向不一致时再调整 scale/offsetDegrees。")]
+    public JointAngleCalibration elevationHeadingCalibration = new();
 
     [Tooltip("每隔一段时间打印 MQTT 原始角度、映射目标和关节实际角度。仅用于现场诊断。")]
     public bool logJointsDebug = false;
@@ -61,7 +60,7 @@ public class ExcavatorController : MonoBehaviour
     [Min(0.1f)]
     public float jointsDebugLogInterval = 1f;
 
-    [Header("RTK 位姿")]
+    [Header("高程 origin 位姿")]
     [Tooltip("真实世界 1米 = Unity 多少单位（挖掘机约 10m 长，建议先用 1:1）")]
     public float worldScale = 1f;
 
@@ -96,8 +95,9 @@ public class ExcavatorController : MonoBehaviour
     [Tooltip("最大角速度（rad/s），过大时车身会像陀螺/飘")]
     public float maxAngularVelocityRad = 2.5f;
 
-    [Tooltip("RTK 只控制水平朝向（Yaw），允许底盘随坡面自然俯仰/侧倾。履带车辆建议开启。")]
-    public bool rtkControlsYawOnly = true;
+    [FormerlySerializedAs("rtkControlsYawOnly")]
+    [Tooltip("高程 origin.yaw 只控制水平朝向，允许底盘随坡面自然俯仰/侧倾。履带车辆建议开启。")]
+    public bool elevationControlsYawOnly = true;
 
     [Tooltip("第一次收到高程 origin 时直接放置到目标地面，避免从场景原点高速拖行几十米导致翻车。")]
     public bool teleportOnFirstPositionTarget = true;
@@ -106,7 +106,7 @@ public class ExcavatorController : MonoBehaviour
     [Tooltip("用受控的不可移动根底盘承载关节。运行时 TerrainCollider 变形不再能把整机掀翻。")]
     public bool stabilizeBaseAgainstTerrainUpdates = true;
 
-    [Tooltip("稳定模式下底盘保持直立，RTK 只更新 Yaw；不让高程图的局部噪声改变俯仰/侧倾。")]
+    [Tooltip("稳定模式下底盘保持直立，origin.yaw 只更新水平朝向；不让高程图的局部噪声改变俯仰/侧倾。")]
     public bool keepStabilizedBaseUpright = true;
 
     [Tooltip("履带接地范围的半宽(X)/半长(Z)，取范围内最高地面，避免坡面穿进履带。")]
@@ -139,8 +139,6 @@ public class ExcavatorController : MonoBehaviour
     private bool _rotationTargetReady;
     private bool _initialPositionTeleportPending;
     private Quaternion _uprightBaseRotation;
-    private bool _jointsHeadingTargetReady;
-    private float _lastJointsHeadingTime;
 
     // 挖掘机的根 ArticulationBody（base link），
     // 位姿通过 TeleportRoot 设置
@@ -336,37 +334,35 @@ public class ExcavatorController : MonoBehaviour
     }
 
     /// <summary>
-    /// Applies the whole machine's absolute map heading. Unity's +Z is north and +X is east,
-    /// so a positive Y Euler angle already matches the input convention (clockwise from above:
-    /// 0° north, 90° east). The existing base-pose smoothing takes the shortest path across
-    /// the 0°/360° boundary.
+    /// Applies metadata.origin.yaw after it has been converted from ENU radians to a compass
+    /// heading. Unity's +Z is north and +X is east, so a positive Y Euler angle directly
+    /// matches 0° north, 90° east and clockwise-positive. The existing base-pose smoothing
+    /// takes the shortest path across the 0°/360° boundary.
     /// </summary>
-    public void ApplyGlobalHeading(float headingDegrees)
+    public void ApplyElevationHeading(float headingDegrees)
     {
-        if (!jointsRotateControlEnabled)
+        if (!elevationYawControlEnabled)
             return;
 
         if (!IsFinite(headingDegrees))
         {
-            Debug.LogWarning("[Excavator] 忽略包含 NaN/Infinity 的 joints.rotate.angle");
+            Debug.LogWarning("[Excavator] 忽略包含 NaN/Infinity 的 elevation origin.yaw");
             return;
         }
 
         float unityHeading = CalibrateJointAngle(
-            rotateHeadingCalibration,
+            elevationHeadingCalibration,
             headingDegrees);
         unityHeading = Mathf.Repeat(unityHeading, 360f);
 
         _targetBaseRotation = Quaternion.Euler(0f, unityHeading, 0f);
         _rotationTargetReady = true;
-        _jointsHeadingTargetReady = true;
-        _lastJointsHeadingTime = Time.unscaledTime;
     }
 
     // ── RTK 位姿 API ────────────────────────────────────────
 
     /// <summary>
-    /// 兼容旧调用：传入 RTK 相对位移（米）和 ENU 四元数。
+    /// 兼容旧调用：仅使用 RTK 相对位移（米）；朝向由 elevation origin.yaw 负责。
     /// RTK 坐标系 ENU: x=东, y=北, z=上
     /// Unity 坐标系:     x=右, y=上, z=前
     /// 转换: Unity.x = ENU.x, Unity.y = ENU.z, Unity.z = ENU.y
@@ -382,34 +378,6 @@ public class ExcavatorController : MonoBehaviour
             );
             _positionTargetReady = true;
         }
-
-        if (rotation != null && !JointsHeadingOverridesRtk())
-        {
-            var enu = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
-            _targetBaseRotation = EnuToUnity(enu);
-            _rotationTargetReady = true;
-        }
-    }
-
-    /// <summary>
-    /// Updates only the base rotation from RTK. Position is supplied by elevation metadata.origin.
-    /// </summary>
-    public void ApplyRtkRotation(RtkRotation rotation)
-    {
-        if (rotation == null || JointsHeadingOverridesRtk()) return;
-
-        var enu = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
-        _targetBaseRotation = EnuToUnity(enu);
-        _rotationTargetReady = true;
-    }
-
-    private bool JointsHeadingOverridesRtk()
-    {
-        if (!jointsRotateControlEnabled || !_jointsHeadingTargetReady)
-            return false;
-
-        return jointsRotateRtkOverrideSeconds <= 0f
-            || Time.unscaledTime - _lastJointsHeadingTime <= jointsRotateRtkOverrideSeconds;
     }
 
     /// <summary>
@@ -494,7 +462,7 @@ public class ExcavatorController : MonoBehaviour
             Drive(bucket, bucketInput);
         }
 
-        // 高程图 origin 控制位置，RTK 控制朝向。
+        // 高程图 origin 控制位置和朝向。
         if (_positionTargetReady || _rotationTargetReady)
             ApplyBasePoseSmooth();
     }
@@ -545,11 +513,10 @@ public class ExcavatorController : MonoBehaviour
                 _rootBody.velocity = new Vector3(horizVel.x, vy, horizVel.z);
             }
 
-            // Elevation position updates must not implicitly lock pitch/roll. Only an
-            // actual RTK rotation message enables orientation control.
+            // Elevation yaw controls only the horizontal heading when yaw-only mode is enabled.
             if (_rotationTargetReady)
             {
-                if (rtkControlsYawOnly)
+                if (elevationControlsYawOnly)
                     ApplyYawAngularVelocity();
                 else
                     ApplyFullAngularVelocity();
@@ -724,16 +691,6 @@ public class ExcavatorController : MonoBehaviour
         }
 
         return fallbackY;
-    }
-
-    /// <summary>
-    /// ENU 四元数 → Unity 四元数。
-    /// ENU(x=东,y=北,z=上) → Unity(x=右,y=上,z=前)
-    /// 交换 y↔z 并翻转手性（左手系）。
-    /// </summary>
-    private static Quaternion EnuToUnity(Quaternion enu)
-    {
-        return new Quaternion(enu.x, enu.z, enu.y, -enu.w);
     }
 
     private void UpdateJointAngleTargets()

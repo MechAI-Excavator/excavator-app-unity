@@ -129,6 +129,8 @@ public class UILogic : MonoBehaviour
     VisualElement _indicatorForwardRotator;
     bool _hasDisplayedJointAngles;
     ExcavatorJointAngles _displayedJointAngles;
+    bool _hasDisplayedHeading;
+    ExcavatorHeading _displayedHeading;
     bool _loggedFirstJointAngleUpdate;
     bool _loggedDirectionIndicatorBinding;
     bool _directionHeadingReady;
@@ -163,11 +165,16 @@ public class UILogic : MonoBehaviour
         ExcavatorJointStateStore.Changed += OnJointAnglesChanged;
         if (ExcavatorJointStateStore.TryGetLatest(out var angles))
             OnJointAnglesChanged(angles);
+
+        ExcavatorHeadingStateStore.Changed += OnHeadingChanged;
+        if (ExcavatorHeadingStateStore.TryGetLatest(out var heading))
+            OnHeadingChanged(heading);
     }
 
     void OnDisable()
     {
         ExcavatorJointStateStore.Changed -= OnJointAnglesChanged;
+        ExcavatorHeadingStateStore.Changed -= OnHeadingChanged;
         UnbindSettingsDrawer();
         UnbindTestControls();
         _telemetryLabels.Clear();
@@ -177,6 +184,7 @@ public class UILogic : MonoBehaviour
         _navigationArrow = null;
         _indicatorForwardRotator = null;
         _hasDisplayedJointAngles = false;
+        _hasDisplayedHeading = false;
         _directionHeadingReady = false;
     }
 
@@ -185,6 +193,7 @@ public class UILogic : MonoBehaviour
         EnsureJointAngleLabels();
         EnsureDirectionIndicators();
         SyncLatestJointAngles();
+        SyncLatestHeading();
         if (enableKeyboardMock)
             SetDirectionHeading(mockDirectionHeading);
         UpdateDirectionIndicators();
@@ -381,13 +390,15 @@ public class UILogic : MonoBehaviour
     void EnsureDirectionIndicators()
     {
         if (_navigationArrow?.panel != null
-            && _indicatorForwardRotator?.panel != null)
+            || _indicatorForwardRotator?.panel != null)
         {
             return;
         }
 
         BindDirectionIndicators();
-        if (_directionHeadingReady)
+        if (ExcavatorHeadingStateStore.TryGetLatest(out var heading))
+            OnHeadingChanged(heading);
+        else if (_directionHeadingReady)
             ApplyDirectionIndicatorRotation(_displayedDirectionHeading);
     }
 
@@ -396,8 +407,6 @@ public class UILogic : MonoBehaviour
         SetAngleText(_boomAngleLabel, angles.Boom);
         SetAngleText(_stickAngleLabel, angles.Stick);
         SetAngleText(_bucketAngleLabel, angles.Bucket);
-        if (angles.HasRotate)
-            SetDirectionHeading(angles.Rotate);
         _displayedJointAngles = angles;
         _hasDisplayedJointAngles = true;
 
@@ -420,15 +429,36 @@ public class UILogic : MonoBehaviour
             && angles.Timestamp.Equals(_displayedJointAngles.Timestamp)
             && Mathf.Approximately(angles.Boom, _displayedJointAngles.Boom)
             && Mathf.Approximately(angles.Stick, _displayedJointAngles.Stick)
-            && Mathf.Approximately(angles.Bucket, _displayedJointAngles.Bucket)
-            && angles.HasRotate == _displayedJointAngles.HasRotate
-            && (!angles.HasRotate
-                || Mathf.Approximately(angles.Rotate, _displayedJointAngles.Rotate)))
+            && Mathf.Approximately(angles.Bucket, _displayedJointAngles.Bucket))
         {
             return;
         }
 
         OnJointAnglesChanged(angles);
+    }
+
+    void OnHeadingChanged(ExcavatorHeading heading)
+    {
+        SetDirectionHeading(heading.HeadingDegrees);
+        _displayedHeading = heading;
+        _hasDisplayedHeading = true;
+    }
+
+    void SyncLatestHeading()
+    {
+        if (!ExcavatorHeadingStateStore.TryGetLatest(out var heading))
+            return;
+
+        if (_hasDisplayedHeading
+            && heading.Timestamp.Equals(_displayedHeading.Timestamp)
+            && Mathf.Approximately(
+                heading.EnuYawRadians,
+                _displayedHeading.EnuYawRadians))
+        {
+            return;
+        }
+
+        OnHeadingChanged(heading);
     }
 
     /// <summary>

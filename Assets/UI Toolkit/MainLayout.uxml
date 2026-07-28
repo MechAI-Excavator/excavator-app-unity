@@ -24,9 +24,9 @@
 
                     <ui:VisualElement class="indicator-image indicator-outer" />
                     <!-- <ui:VisualElement class="indicator-image indicator-horizontal" /> -->
-                    <ui:VisualElement name="indicator-forward-rotator" class="indicator-forward-rotator">
+                    <!-- <ui:VisualElement name="indicator-forward-rotator" class="indicator-forward-rotator">
                         <ui:VisualElement class="indicator-image indicator-forward" />
-                    </ui:VisualElement>
+                    </ui:VisualElement> -->
                     <ui:VisualElement class="indicator-image navigation-arrow" />
                 </ui:VisualElement>
 

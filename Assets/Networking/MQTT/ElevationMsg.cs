@@ -43,4 +43,7 @@ public class ElevationOrigin
     public float x;
     public float y;
     public float z;
+
+    // ENU yaw in radians: east=0, counter-clockwise positive.
+    public float yaw;
 }

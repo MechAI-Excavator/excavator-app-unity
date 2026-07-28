@@ -328,15 +328,6 @@ public class MqttManager : MonoBehaviour
                 return;
             }
             OnRtkUpdated?.Invoke(rtk);
-
-            if (_excavatorController == null)
-                _excavatorController = FindFirstObjectByType<ExcavatorController>();
-
-            if (_excavatorController != null)
-            {
-                // Elevation metadata.origin now owns translation; RTK still owns orientation.
-                _excavatorController.ApplyRtkRotation(rtk.rotation);
-            }
         }
         catch (Exception e)
         {
@@ -363,8 +354,6 @@ public class MqttManager : MonoBehaviour
                 data.joints.boom.angle,
                 data.joints.stick.angle,
                 data.joints.bucket.angle,
-                data.joints.rotate != null ? data.joints.rotate.angle : 0f,
-                data.joints.rotate != null,
                 data.timestamp);
             ExcavatorJointStateStore.Publish(angles);
 
@@ -374,8 +363,7 @@ public class MqttManager : MonoBehaviour
                 Debug.Log(
                     $"[MQTT] 已接收首帧关节数据 topic={topic} " +
                     $"boom={angles.Boom:F3} stick={angles.Stick:F3} " +
-                    $"bucket={angles.Bucket:F3}" +
-                    (angles.HasRotate ? $" rotate={angles.Rotate:F3}" : " rotate=<missing>"));
+                    $"bucket={angles.Bucket:F3}");
             }
 
             if (_excavatorController == null)
@@ -390,11 +378,6 @@ public class MqttManager : MonoBehaviour
                     angles.Boom,
                     angles.Stick,
                     angles.Bucket);
-
-                // rotate is the whole machine's absolute map heading:
-                // 0°=north(+Z), 90°=east(+X), clockwise positive.
-                if (angles.HasRotate)
-                    _excavatorController.ApplyGlobalHeading(angles.Rotate);
             }
             else
             {
@@ -412,17 +395,26 @@ public class MqttManager : MonoBehaviour
         try
         {
             var elevation = JsonUtility.FromJson<ElevationMsg>(msg);
-            if (elevation?.metadata == null || elevation.data == null)
+            if (elevation?.metadata == null)
             {
-                Debug.LogWarning("[MQTT] 高程图 JSON 解析失败或数据为空");
+                Debug.LogWarning("[MQTT] 高程图 JSON 解析失败或 metadata 为空");
                 return;
             }
 
             var metadata = elevation.metadata;
+            ApplyElevationHeading(elevation);
+
+            if (elevation.data == null)
+            {
+                Debug.LogWarning("[MQTT] 高程图 data 为空；已更新朝向，但未更新地形和位置");
+                return;
+            }
+
             Debug.Log($"[MQTT] 高程图 seq={elevation.sequence} " +
                       $"samples={metadata.width}x{metadata.height} " +
                       $"tile=({metadata.tile_x},{metadata.tile_y}) size={metadata.tile_size_meters:F2}m " +
-                      $"origin=({metadata.origin?.x:F2},{metadata.origin?.y:F2},{metadata.origin?.z:F2})");
+                      $"origin=({metadata.origin?.x:F2},{metadata.origin?.y:F2},{metadata.origin?.z:F2}) " +
+                      $"yaw={metadata.origin?.yaw:F6}rad");
 
             var tileManager = FindFirstObjectByType<TerrainTileManager>();
             if (tileManager != null)
@@ -446,6 +438,36 @@ public class MqttManager : MonoBehaviour
         {
             Debug.LogError($"[MQTT] 高程图解析异常: {e.Message}");
         }
+    }
+
+    private void ApplyElevationHeading(ElevationMsg elevation)
+    {
+        var origin = elevation?.metadata?.origin;
+        if (origin == null)
+            return;
+
+        float yawRadians = origin.yaw;
+        if (float.IsNaN(yawRadians) || float.IsInfinity(yawRadians))
+        {
+            Debug.LogWarning("[MQTT] elevation metadata.origin.yaw 为 NaN/Infinity，已忽略本次朝向更新");
+            return;
+        }
+
+        float headingDegrees =
+            ExcavatorHeadingStateStore.EnuYawToCompassDegrees(yawRadians);
+        var heading = new ExcavatorHeading(
+            headingDegrees,
+            yawRadians,
+            elevation.timestamp);
+        ExcavatorHeadingStateStore.Publish(heading);
+
+        if (_excavatorController == null)
+            _excavatorController = FindFirstObjectByType<ExcavatorController>();
+
+        if (_excavatorController != null)
+            _excavatorController.ApplyElevationHeading(headingDegrees);
+        else
+            Debug.LogWarning("[MQTT] 场景中未找到 ExcavatorController，无法应用高程图 origin.yaw");
     }
 
     private void ApplyElevationOrigin(ElevationMsg elevation, Terrain terrain)
@@ -496,7 +518,6 @@ public class JointKinematicsPayload
     public JointKinematicsState stick;
     public JointKinematicsState boom;
     public JointKinematicsState cabin;
-    public JointKinematicsState rotate;
 }
 
 [Serializable]
